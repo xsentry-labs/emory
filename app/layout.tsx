@@ -1,20 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, Inter, Source_Serif_4 } from "next/font/google";
+import { Inter, Newsreader } from "next/font/google";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-const display = Source_Serif_4({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const mono = IBM_Plex_Mono({
+const display = Newsreader({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  variable: "--font-mono",
+  style: ["normal", "italic"],
+  variable: "--font-display",
   display: "swap",
 });
 
@@ -25,22 +18,18 @@ const sans = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Emory — The Daily Growth Wire",
+  title: "Emory — the only marketing team you'll need",
   description:
-    "Emory is an AI CMO. Eight marketing desks file dispatches on your site every day; you approve, edit or spike them.",
+    "Emory is an AI marketing team. Eleven agents handle getting found, content, ads, conversations and follow-ups, run by one brain that learns your business. Free analysis, no signup.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#EEEAE1",
+  themeColor: "#0D0D0F",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${mono.variable} ${sans.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body className="min-h-screen bg-paper">
         {children}
         <Toaster />

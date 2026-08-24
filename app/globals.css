@@ -4,24 +4,15 @@
 
 @layer base {
   :root {
-    --paper: 40 28% 91%;
-    --card: 0 0% 100%;
-    --ink: 223 11% 12%;
-    --ink-soft: 220 5% 37%;
-    --slate: 218 5% 44%;
-    --line: 42 26% 82%;
-    --wire-red: 0 74% 40%;
-    --teletype-green: 150 40% 31%;
-    --desk-gold: 43 89% 35%;
-    --desk-navy: 212 51% 36%;
-    --desk-purple: 263 33% 45%;
-    --desk-orange: 30 100% 36%;
-    --desk-teal: 186 59% 30%;
-    --ring: 223 11% 12%;
+    --ink: #0d0d0f;
+    --paper: #ffffff;
+    --wash: #f7f8f9;
+    --line: #e6e9ec;
+    --mute: #6f7883;
   }
 
   * {
-    border-color: hsl(var(--line));
+    border-color: var(--line);
   }
 
   html {
@@ -29,63 +20,57 @@
   }
 
   body {
-    @apply bg-paper text-ink font-sans antialiased;
-    font-feature-settings: "cv05" 1, "ss01" 1;
+    @apply bg-paper font-sans text-body text-ink antialiased;
   }
 
-  /* One focus treatment everywhere: a hard ink rule offset from the control. */
+  /* Numbers in product surfaces are always tabular. */
+  .tnum,
+  table,
+  [data-metric] {
+    font-variant-numeric: tabular-nums;
+  }
+
   :focus-visible {
     @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
   }
 
   ::selection {
-    background: hsl(var(--ink));
-    color: hsl(var(--paper));
+    background: var(--ink);
+    color: var(--paper);
   }
 
   ::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+    width: 12px;
+    height: 12px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: hsl(var(--line));
-    border: 3px solid hsl(var(--paper));
+    background: var(--line);
+    border: 4px solid var(--paper);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--slate) / 0.6);
+    background: #d3d8dd;
   }
 }
 
 @layer components {
-  /* Mono utility lockup used for desk tags, timestamps, labels, stat numerals. */
-  .wire-label {
-    @apply font-mono text-2xs uppercase tracking-wire text-slate;
+  .card {
+    @apply rounded-lg border border-line bg-paper;
   }
-  .wire-label-strong {
-    @apply font-mono text-2xs uppercase tracking-wire text-ink;
+  .measure {
+    @apply max-w-measure;
+  }
+  .label {
+    @apply text-caption font-medium text-mute;
   }
   .rule {
     @apply border-t border-line;
   }
-  .rule-double {
-    border-top: 3px double hsl(var(--line));
-  }
-  .sheet {
-    @apply rounded-lg border border-line/70 bg-card shadow-sheet;
-  }
-  .newsprint {
-    background-image: radial-gradient(
-      hsl(var(--ink) / 0.035) 1px,
-      transparent 1px
-    );
-    background-size: 3px 3px;
-  }
-  .headline-link {
-    @apply decoration-line decoration-2 underline-offset-4 hover:underline;
+  .section-rule {
+    border-top: 2px solid var(--ink);
   }
 }
 

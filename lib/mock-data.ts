@@ -1,25 +1,28 @@
 import type {
-  BrandVoiceRule,
-  Competitor,
-  CompanyProfile,
-  Desk,
-  Dispatch,
-  Integration,
-  KeywordGap,
-  SeoIssue,
-  StrategyDoc,
+  AuditFinding,
+  BrainChange,
+  BrainField,
+  Connector,
+  EmoryAction,
+  Experiment,
+  OnboardingQuestion,
+  Person,
+  ProofLine,
+  RevenueSource,
+  TimelineEvent,
+  Workspace,
 } from "./types";
 
 /**
- * Every string below may carry {{brand}} / {{domain}} tokens. They are resolved
- * once, when the store seeds itself from the domain typed at onboarding, so the
- * whole wire reads as if the desks really did file on that site.
+ * Copy carries {{brand}} / {{domain}} slots, resolved once when the workspace
+ * is created from the URL someone typed. Emory speaks in all of it; agents are
+ * named only where an agent owns the thing being shown.
  */
-export const BRAND_TOKEN = /\{\{(brand|domain)\}\}/g;
+const TOKEN = /\{\{(brand|domain)\}\}/g;
 
 export function hydrate<T>(value: T, brand: string, domain: string): T {
   if (typeof value === "string") {
-    return value.replace(BRAND_TOKEN, (_m, key) =>
+    return value.replace(TOKEN, (_m, key) =>
       key === "brand" ? brand : domain,
     ) as unknown as T;
   }
@@ -28,17 +31,14 @@ export function hydrate<T>(value: T, brand: string, domain: string): T {
   }
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value)) {
-      out[key] = hydrate(item, brand, domain);
-    }
+    for (const [key, item] of Object.entries(value)) out[key] = hydrate(item, brand, domain);
     return out as T;
   }
   return value;
 }
 
-/** Brand name inferred from the filed domain: "northbeam.io" -> "Northbeam". */
-export function brandFromDomain(domain: string) {
-  const root = domain.split(".")[0]?.replace(/[-_]/g, " ") ?? "the brand";
+export function companyFromDomain(domain: string) {
+  const root = domain.split(".")[0]?.replace(/[-_]/g, " ") ?? "your company";
   return root
     .split(" ")
     .filter(Boolean)
@@ -46,1063 +46,1309 @@ export function brandFromDomain(domain: string) {
     .join(" ");
 }
 
-const ago = (minutes: number) =>
-  new Date(Date.now() - minutes * 60_000).toISOString();
+const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
-export const DESKS: Desk[] = [
-  {
-    id: "seo",
-    tag: "SEO DESK",
-    name: "Search",
-    beat: "Rankings, SERP movement and the pages worth writing next.",
-    dot: "bg-desk-gold",
-    text: "text-desk-gold",
-    chip: "bg-desk-gold/10 text-desk-gold",
-    rule: "border-desk-gold",
-    icon: "search",
-  },
-  {
-    id: "geo",
-    tag: "GEO DESK",
-    name: "AI Answers",
-    beat: "How ChatGPT, Perplexity and AI Overviews describe you — or don't.",
-    dot: "bg-desk-purple",
-    text: "text-desk-purple",
-    chip: "bg-desk-purple/10 text-desk-purple",
-    rule: "border-desk-purple",
-    icon: "sparkles",
-  },
-  {
-    id: "reddit",
-    tag: "REDDIT DESK",
-    name: "Reddit",
-    beat: "Threads where buyers ask for a tool like yours by name.",
-    dot: "bg-wire-red",
-    text: "text-wire-red",
-    chip: "bg-wire-red/10 text-wire-red",
-    rule: "border-wire-red",
-    icon: "messages",
-  },
-  {
-    id: "x",
-    tag: "X DESK",
-    name: "X / Twitter",
-    beat: "Timeline moments where a reply lands better than a post.",
-    dot: "bg-ink",
-    text: "text-ink",
-    chip: "bg-ink/10 text-ink",
-    rule: "border-ink",
-    icon: "hash",
-  },
-  {
-    id: "linkedin",
-    tag: "LINKEDIN DESK",
-    name: "LinkedIn",
-    beat: "Founder and operator posts aimed at the buying committee.",
-    dot: "bg-desk-navy",
-    text: "text-desk-navy",
-    chip: "bg-desk-navy/10 text-desk-navy",
-    rule: "border-desk-navy",
-    icon: "briefcase",
-  },
-  {
-    id: "articles",
-    tag: "FEATURES DESK",
-    name: "Longform",
-    beat: "Articles, teardowns and original data worth a byline.",
-    dot: "bg-desk-teal",
-    text: "text-desk-teal",
-    chip: "bg-desk-teal/10 text-desk-teal",
-    rule: "border-desk-teal",
-    icon: "newspaper",
-  },
-  {
-    id: "hn",
-    tag: "HN DESK",
-    name: "Hacker News",
-    beat: "Front-page threads where an honest technical answer travels.",
-    dot: "bg-desk-orange",
-    text: "text-desk-orange",
-    chip: "bg-desk-orange/10 text-desk-orange",
-    rule: "border-desk-orange",
-    icon: "flame",
-  },
-  {
-    id: "technical",
-    tag: "TECH DESK",
-    name: "Technical SEO",
-    beat: "Crawl, render and Core Web Vitals faults that cap everything else.",
-    dot: "bg-slate",
-    text: "text-slate",
-    chip: "bg-slate/10 text-slate",
-    rule: "border-slate",
-    icon: "wrench",
-  },
-];
-
-export const DESK_BY_ID = Object.fromEntries(
-  DESKS.map((desk) => [desk.id, desk]),
-) as Record<Desk["id"], Desk>;
-
-export const SEED_DISPATCHES: Dispatch[] = [
-  {
-    id: "dsp-001",
-    deskId: "geo",
-    kicker: "AI ANSWER VISIBILITY",
-    headline:
-      "ChatGPT names three rivals and not {{brand}} on the buying question that matters",
-    body: "Across 40 runs of “best tools for automated marketing reporting,” ChatGPT cited Ravelin, Northsound and Cadence — {{brand}} appeared in 4 of 40. The models are pulling from three comparison round-ups none of which include us, plus a G2 category page where our profile is thin.\n\nRecommended filing: publish a source-grade comparison page at {{domain}}/compare that answers the question directly in the first 80 words, with a specification table the models can lift verbatim. Then pitch the two round-up editors with a factual correction and a screenshot of the missing row.\n\nDraft opener: “{{brand}} automates the weekly marketing report end to end — pulling spend, pipeline and attribution into one reviewable brief. Here is how it compares with the three tools most often recommended alongside it.”",
-    source: "40-run answer sweep · ChatGPT, Perplexity, Claude, AI Overviews",
-    impact: {
-      label: "Answer share",
-      value: "10% → 55%",
-      note: "Projected within two crawls of the comparison page going live",
-    },
-    priority: "urgent",
-    status: "pending",
-    filedAt: ago(22),
-    tags: ["comparison page", "answer engines", "category"],
-  },
-  {
-    id: "dsp-002",
-    deskId: "seo",
-    kicker: "SERP MOVEMENT",
-    headline:
-      "Cadence took page one for “{{brand}} alternative” overnight — file the counter-page today",
-    body: "Cadence published /alternatives/{{brand}} eleven days ago and it now sits at position 4 for eight branded-alternative queries worth 2,900 searches a month combined. Our own comparison content is a single paragraph on the pricing page.\n\nRecommended filing: a proper /alternatives page under our control that concedes the two things Cadence genuinely does better, then wins on the three that decide the deal — migration time, per-seat cost at 20+ seats, and the audit trail. Honest comparison pages outrank defensive ones; the desk has the objection language pulled from 60 sales-call notes.\n\nStructure filed: verdict box up top, spec table, “when Cadence is the better buy” section, migration checklist, FAQ marked up with schema.",
-    source: "Daily rank tracker · 8 branded queries",
-    impact: {
-      label: "Recoverable clicks",
-      value: "+1,240/mo",
-      note: "Position 4→1 on the branded-alternative cluster",
-    },
-    priority: "urgent",
-    status: "pending",
-    filedAt: ago(46),
-    tags: ["competitive", "bottom of funnel", "page brief"],
-  },
-  {
-    id: "dsp-003",
-    deskId: "technical",
-    kicker: "CRAWL FAULT",
-    headline:
-      "Blog pagination is serving noindex past page 2 — 190 posts are invisible",
-    body: "The rendered HTML on {{domain}}/blog/page/3 and beyond carries <meta name=\"robots\" content=\"noindex,follow\">, applied by a template condition that was meant to hide tag archives. 190 published posts have no crawlable path from the blog index; 41 of them still hold rankings from internal links alone.\n\nFix ready for review: remove the condition from the pagination template, keep it on /blog/tag/*, then submit the recovered URLs in a fresh sitemap. The tech desk has the one-line template diff and a before/after crawl of 200 URLs attached.\n\nThis is the highest-leverage item on the wire this week: every content dispatch we approve compounds on top of a blog that is currently half-crawlable.",
-    source: "Nightly crawl · 4,180 URLs · diff vs. last Tuesday",
-    impact: {
-      label: "Pages recovered",
-      value: "190",
-      note: "41 already ranking despite being uncrawlable",
-    },
-    priority: "urgent",
-    status: "pending",
-    filedAt: ago(95),
-    tags: ["indexation", "one-line fix", "blog"],
-  },
-  {
-    id: "dsp-004",
-    deskId: "reddit",
-    kicker: "THREAD IN PLAY",
-    headline:
-      "r/SaaS thread asking exactly what {{brand}} does is 90 minutes old and climbing",
-    body: "Thread: “How are you handling weekly marketing reporting without a full-time analyst?” — 34 comments, top comment recommends doing it by hand in Sheets. The asker runs a 30-person B2B company, which is dead centre of our ICP.\n\nDraft reply (from the founder account, disclosed): “We built {{brand}} because we were the person doing this by hand every Monday. Two things that helped before you buy anything: pick the four numbers you will actually act on, and write the commentary before you look at the charts. If you want it automated after that, mine is at {{domain}} — happy to answer setup questions either way.”\n\nHouse rule respected: disclosure in the first line, one link, and genuine advice that stands on its own if the link is stripped.",
-    source: "r/SaaS · 34 comments · rising",
-    impact: {
-      label: "Thread reach",
-      value: "12k views",
-      note: "Median for a rising r/SaaS thread at this comment velocity",
-    },
-    priority: "standard",
-    status: "pending",
-    filedAt: ago(88),
-    tags: ["community", "founder voice", "time-sensitive"],
-  },
-  {
-    id: "dsp-005",
-    deskId: "x",
-    kicker: "TIMELINE MOMENT",
-    headline: "A 400-repost thread on dashboard fatigue is missing our answer",
-    body: "@priyabuilds posted “nobody reads the dashboard. they read the one sentence someone writes above it.” — 412 reposts, and the replies are full of our exact buyers arguing about it.\n\nDraft reply: “This is the whole reason we stopped shipping dashboards. The weekly brief that says ‘spend is up 12% because the retargeting cap lifted on Tuesday’ gets read by the whole exec team. The chart underneath it gets read by nobody. We wrote up what changed when we flipped the order: {{domain}}/brief”\n\nThe desk recommends replying rather than quote-posting — quote-posts of a popular take read as piggybacking, replies read as participating.",
-    source: "X · 412 reposts · in-network account",
-    impact: {
-      label: "Est. impressions",
-      value: "38k",
-      note: "Reply position 6 on a thread this size",
-    },
-    priority: "standard",
-    status: "pending",
-    filedAt: ago(140),
-    tags: ["reply not post", "founder account"],
-  },
-  {
-    id: "dsp-006",
-    deskId: "linkedin",
-    kicker: "OPERATOR POST",
-    headline:
-      "File the “we killed our own dashboard” post while the category is arguing about it",
-    body: "Three of the accounts our buyers follow posted about reporting overload this week. The window is open for a first-person operator post rather than a product one.\n\nDraft: “We deleted the dashboard we spent four months building.\n\nNot because it was bad. Because eleven people had access and two opened it in a month.\n\nWhat replaced it: one page, sent Monday 7am. Four numbers, and a paragraph explaining why each moved. Written by a machine, edited by a human in about six minutes.\n\nThe uncomfortable part: the paragraph was always the product. The charts were decoration we were proud of.\n\nIf your team has a dashboard nobody opens, the fix probably is not a better dashboard.”\n\nNo link in the post body; link in the first comment, per platform reach behaviour.",
-    source: "Feed scan · 3 in-network posts on the theme this week",
-    impact: {
-      label: "Est. reach",
-      value: "9.4k",
-      note: "Founder account baseline × 2.1 for first-person posts",
-    },
-    priority: "standard",
-    status: "pending",
-    filedAt: ago(210),
-    tags: ["founder voice", "no link in body"],
-  },
-  {
-    id: "dsp-007",
-    deskId: "hn",
-    kicker: "FRONT PAGE",
-    headline:
-      "“Ask HN: what broke when you automated your reporting?” is at #14 with 96 comments",
-    body: "The thread rewards specifics and punishes marketing language, so the desk has drafted a comment with real numbers and a real failure in it.\n\nDraft: “We automate weekly marketing reports, so: the thing that broke for us was attribution windows. Our first version recomputed a 30-day window every run, so a report sent Monday disagreed with the same report re-run Thursday, and people stopped trusting it faster than we could explain why. We froze the window at send time and stored the snapshot. Boring fix, but trust in an automated report is binary — once two runs disagree you are back to Sheets.”\n\nNo link. HN converts on credibility, not clicks; the profile URL does the work.",
-    source: "Hacker News · #14 · 96 comments",
-    impact: {
-      label: "Qualified reach",
-      value: "6.8k devs",
-      note: "Front-page thread, technical buyer overlap 40%",
-    },
-    priority: "wire",
-    status: "pending",
-    filedAt: ago(260),
-    tags: ["no link", "credibility play"],
-  },
-  {
-    id: "dsp-008",
-    deskId: "articles",
-    kicker: "ORIGINAL DATA",
-    headline:
-      "Teardown: we read 200 weekly marketing reports so nobody else has to",
-    body: "A 1,800-word feature built on the 200 anonymised reports in our own corpus. The finding that carries the piece: 71% of reports open with a chart, and the ones that get replies open with a sentence.\n\nOutline filed:\n1. The Monday ritual nobody defends\n2. What 200 reports actually contain (chart of section frequency)\n3. The 12% that get replies — what they do differently\n4. A template you can steal, with the commentary slots marked\n5. What we automated and what we deliberately left to a human\n\nOriginal data is the linkable asset here — the desk expects the section-frequency chart to be the thing people cite. Publish on {{domain}}/research, then file the LinkedIn and X cut-downs off the same piece.",
-    source: "Internal corpus · 200 anonymised reports",
-    impact: {
-      label: "Referring domains",
-      value: "+18 est.",
-      note: "Original-data features average 18 links in 90 days",
-    },
-    priority: "standard",
-    status: "approved",
-    filedAt: ago(1_500),
-    tags: ["original research", "linkable asset"],
-  },
-  {
-    id: "dsp-009",
-    deskId: "seo",
-    kicker: "PAGE BRIEF",
-    headline: "Build the “marketing report template” hub — 4,400 searches, nobody owns it",
-    body: "The top three results are all thin blog posts with no downloadable asset; the SERP has a featured snippet nobody has claimed properly and a People Also Ask block with six questions we can answer on one page.\n\nBrief approved and filed to the queue: a hub page with the template embedded, six PAA answers marked up with FAQ schema, and three internal links from the highest-authority blog posts we already have.\n\nTarget cluster: marketing report template (4,400), weekly marketing report (1,900), marketing report example (1,600).",
-    source: "Keyword gap scan · cluster of 11 queries",
-    impact: {
-      label: "Cluster volume",
-      value: "7,900/mo",
-      note: "Difficulty 22 — lowest in the tracked set",
-    },
-    priority: "standard",
-    status: "approved",
-    filedAt: ago(2_600),
-    tags: ["hub page", "schema", "top of funnel"],
-  },
-  {
-    id: "dsp-010",
-    deskId: "geo",
-    kicker: "SOURCE CORRECTION",
-    headline: "Perplexity is citing a 2023 pricing page that no longer exists",
-    body: "Perplexity answers about {{brand}} pricing cite an archived page quoting a per-seat number we retired 14 months ago, and two aggregator sites are repeating it. Prospects are arriving pre-anchored to the wrong figure.\n\nApproved plan: publish a canonical, crawlable pricing page with the numbers in plain HTML text rather than inside a script-rendered table, add a dated “pricing last updated” line the models can read, and file correction requests with both aggregators.\n\nThe plain-text detail matters: our current table renders client-side, so the answer engines see an empty page and fall back to whatever is cached elsewhere.",
-    source: "Answer sweep · 12 pricing prompts",
-    impact: {
-      label: "Corrected citations",
-      value: "9 of 12",
-      note: "Prompts currently returning stale pricing",
-    },
-    priority: "standard",
-    status: "approved",
-    filedAt: ago(3_100),
-    tags: ["pricing", "citations", "rendering"],
-  },
-  {
-    id: "dsp-011",
-    deskId: "reddit",
-    kicker: "RAN ON THE WIRE",
-    headline: "Reply in r/marketing on attribution drift is the top comment",
-    body: "Published Tuesday. The reply explained why re-running the same report produces different numbers and how to freeze the attribution window — no pitch, one link at the end.\n\nResult: top comment, 214 upvotes, 31 replies, and the moderator pinned a link to it in the weekly thread. Referral traffic to {{domain}} is 340 sessions with a 4:12 median time on page, which is roughly double our blog average.\n\nThe features desk has picked this up as the basis for a longer piece.",
-    source: "r/marketing · published Tuesday 09:12",
-    impact: {
-      label: "Referral sessions",
-      value: "340",
-      note: "4:12 median time on page · 2× blog average",
-    },
-    priority: "standard",
-    status: "live",
-    filedAt: ago(4_400),
-    tags: ["top comment", "published"],
-  },
-  {
-    id: "dsp-012",
-    deskId: "linkedin",
-    kicker: "RAN ON THE WIRE",
-    headline: "“Four numbers” post is the account's best-performing of the quarter",
-    body: "Published Monday 07:40. 22,900 impressions, 187 reactions, 44 comments, 31 profile visits from named accounts on the target list — including two we have been trying to reach since February.\n\nThe comment thread turned into a de facto feature request list; the features desk has flagged three of them for the longform queue and the product team has the transcript.",
-    source: "LinkedIn · founder account · Monday 07:40",
-    impact: {
-      label: "Impressions",
-      value: "22.9k",
-      note: "3.1× the account's rolling median",
-    },
-    priority: "standard",
-    status: "live",
-    filedAt: ago(5_900),
-    tags: ["published", "inbound"],
-  },
-  {
-    id: "dsp-013",
-    deskId: "articles",
-    kicker: "RAN ON THE WIRE",
-    headline: "“The Monday report is a management problem, not a data problem”",
-    body: "1,400 words, published to {{domain}}/blog nine days ago. Ranking position 6 for “weekly marketing report” after eight days, which is fast for a page with no external links yet.\n\nSix referring domains so far, two of them newsletters in the category. The desk recommends a follow-up piece rather than an update — the comment traffic is asking a different question than the article answers.",
-    source: "{{domain}}/blog · published 9 days ago",
-    impact: {
-      label: "Position",
-      value: "#6",
-      note: "“weekly marketing report” · up from unranked",
-    },
-    priority: "standard",
-    status: "live",
-    filedAt: ago(12_600),
-    tags: ["published", "ranking"],
-  },
-  {
-    id: "dsp-014",
-    deskId: "x",
-    kicker: "RAN ON THE WIRE",
-    headline: "Thread on report-writing latency picked up by two newsletters",
-    body: "Six-post thread published last week on why reports get read when they arrive before the meeting rather than after it. 91k impressions, 640 reposts, and pickups in two operator newsletters with a combined 40k list.\n\n61 link clicks through to {{domain}}/brief and 14 trial starts attributed to the thread in the 72 hours after posting.",
-    source: "X · 6-post thread · published last Thursday",
-    impact: {
-      label: "Trial starts",
-      value: "14",
-      note: "91k impressions · 640 reposts",
-    },
-    priority: "wire",
-    status: "live",
-    filedAt: ago(14_100),
-    tags: ["published", "newsletter pickup"],
-  },
-];
-
-export const SEED_PROFILE: CompanyProfile = {
+export const SEED_WORKSPACE: Workspace = {
   domain: "{{domain}}",
-  brand: "{{brand}}",
-  vertical: "B2B SaaS · Marketing analytics",
-  audience:
-    "Heads of marketing and founder-operators at 20–200 person B2B companies who own the weekly report but have no analyst.",
-  voice: ["Plain-spoken", "Specific", "Operator-to-operator", "No hype"],
-  goal: "Qualified trial starts from organic and community channels",
-  positioning:
-    "{{brand}} writes the weekly marketing report your team actually reads — numbers, commentary and the reason each one moved, delivered before the Monday meeting.",
+  company: "{{brand}}",
+  state: "running",
+  platform: "Next.js on Vercel · content in WordPress",
+  plan: "Emory Complete · Launch · $229 a month",
 };
 
-export const BRAND_VOICE: BrandVoiceRule[] = [
-  {
-    do: "“Spend is up 12% because the retargeting cap lifted on Tuesday.”",
-    dont: "“We leverage AI to unlock actionable marketing insights.”",
-  },
-  {
-    do: "“Two runs of the same report disagreed. Here is why, and the fix.”",
-    dont: "“Our best-in-class platform ensures data accuracy at scale.”",
-  },
-  {
-    do: "“It takes about six minutes to edit. Most people send it unedited by week three.”",
-    dont: "“Save countless hours with our revolutionary automation engine.”",
-  },
-  {
-    do: "“Cadence is better if you need per-channel forecasting. We do not do that.”",
-    dont: "“We are the only complete solution for modern marketing teams.”",
-  },
-];
+/* ---------------- Audit: diagnoses, never fixes ---------------- */
 
-export const STRATEGY_DOCS: StrategyDoc[] = [
-  {
-    id: "doc-positioning",
-    title: "Positioning Brief",
-    kind: "Foundation",
-    summary:
-      "Where {{brand}} sits in a crowded reporting category, and the one sentence every desk writes against.",
-    updated: "Rewritten after the March pricing change",
-    pages: 4,
-    sections: [
-      {
-        heading: "The one-line position",
-        paragraphs: [
-          "{{brand}} writes the weekly marketing report your team actually reads — numbers, commentary and the reason each one moved, delivered before the Monday meeting.",
-          "Everything the desks file is written against that sentence. When a draft could be published by a generic analytics vendor without changing a word, it goes back to the desk.",
-        ],
-      },
-      {
-        heading: "Category context",
-        paragraphs: [
-          "The reporting category splits three ways. Dashboard tools sell surface area and lose on adoption. BI platforms sell power and lose on time-to-value. Agencies sell the human write-up and lose on price and latency.",
-          "{{brand}} takes the agency's deliverable — a written brief a human would send — and delivers it at software price and software latency. That is the wedge, and it is defensible because the hard part is the commentary, not the charts.",
-        ],
-        bullets: [
-          "Dashboards: high surface area, low adoption — we win on “nobody opens it”",
-          "BI platforms: high power, slow setup — we win on week-one value",
-          "Agencies: right deliverable, wrong economics — we win on price and speed",
-        ],
-      },
-      {
-        heading: "What we deliberately do not claim",
-        paragraphs: [
-          "We do not claim per-channel forecasting, MMM, or incrementality testing. Two competitors do those well and prospects who need them should buy those. Conceding this in comparison content measurably improves conversion on the pages where we do compete.",
-        ],
-      },
-      {
-        heading: "Proof points the desks may cite",
-        paragraphs: [
-          "Each of these is verifiable and may be used in any filed draft without further approval. Anything not on this list needs a source attached to the dispatch.",
-        ],
-        bullets: [
-          "Median edit time before send: 6 minutes, across 200 accounts",
-          "71% of reports in our corpus open with a chart; the ones that get replies open with a sentence",
-          "Setup to first report: under 20 minutes for a standard stack",
-        ],
-      },
-    ],
-  },
-  {
-    id: "doc-icp",
-    title: "ICP Dossier",
-    kind: "Foundation",
-    summary:
-      "Who we file for: the buyer, the room they sit in, and the four objections that decide the deal.",
-    updated: "Refreshed from 60 call transcripts",
-    pages: 6,
-    sections: [
-      {
-        heading: "Primary buyer",
-        paragraphs: [
-          "Head of Marketing at a 20–200 person B2B company. Owns the weekly report, has no analyst, and personally assembles it on Sunday night or Monday morning. Reports to a founder or CRO who reads the first paragraph and skips the charts.",
-          "They are not shopping for analytics. They are shopping for their Sunday evening back, and for the report to stop being argued with.",
-        ],
-      },
-      {
-        heading: "The room",
-        paragraphs: [
-          "Three people matter. The buyer wants the time back. The founder wants to trust the numbers without auditing them. The one technical person on the team wants to know where the data comes from and whether it can be re-run.",
-          "Every comparison page and every longform piece should have a paragraph aimed at each. The technical paragraph is the one most often missing, and it is the one that stalls deals in week two.",
-        ],
-      },
-      {
-        heading: "The four objections",
-        paragraphs: [
-          "Pulled from 60 recorded calls. In order of how often they end the conversation:",
-        ],
-        bullets: [
-          "“Will the numbers match what I see in the platform?” — answer with the frozen-window explanation, not a trust claim",
-          "“We already pay for a dashboard.” — answer with the adoption number, not a feature list",
-          "“I don't want it to sound like a robot wrote it.” — answer with a real unedited sample",
-          "“What happens when our stack changes?” — answer with the reconnect flow and the frozen history",
-        ],
-      },
-      {
-        heading: "Who we do not file for",
-        paragraphs: [
-          "Enterprise teams with an in-house analytics function, agencies reselling reporting, and pre-revenue startups with one channel. Desks that file drafts aimed at these audiences get them spiked — the traffic converts at roughly a fifth of the primary segment.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "doc-voice",
-    title: "Voice & Style Sheet",
-    kind: "Editorial",
-    summary:
-      "House style for every desk: sentence rhythm, banned constructions, and how to concede a point.",
-    updated: "Standing document",
-    pages: 3,
-    sections: [
-      {
-        heading: "The rule under all the other rules",
-        paragraphs: [
-          "Write like an operator explaining something to another operator over coffee. Specific, unhurried, willing to say what did not work. If a sentence could appear in any vendor's copy, it is not our sentence.",
-        ],
-      },
-      {
-        heading: "Banned constructions",
-        paragraphs: [
-          "These are spiked on sight, in every channel, including replies filed by the community desks.",
-        ],
-        bullets: [
-          "“Leverage,” “unlock,” “seamless,” “best-in-class,” “game-changing”",
-          "“In today's fast-paced world” and every variant of it",
-          "Rhetorical questions as openers — “Tired of manual reporting?”",
-          "Claims without a number attached, when a number exists",
-        ],
-      },
-      {
-        heading: "How to concede",
-        paragraphs: [
-          "Conceding a competitor's genuine strength is house style, not a slip. It reads as confidence, it survives fact-checking, and on comparison pages it correlates with our highest conversion rates.",
-          "Format: name the competitor, name the specific thing they do better, name the buyer for whom that is decisive. Then move on — no recovery sentence, no “but.”",
-        ],
-      },
-      {
-        heading: "Channel adjustments",
-        paragraphs: [
-          "The voice holds everywhere; the length and the disclosure change.",
-        ],
-        bullets: [
-          "Reddit and HN: disclose affiliation in the first line, one link maximum, advice must stand alone if the link is stripped",
-          "LinkedIn: first person, short paragraphs, link in the first comment",
-          "X: reply rather than quote-post when joining someone else's thread",
-          "Longform: a number or a specific in the first two sentences, always",
-        ],
-      },
-    ],
-  },
-  {
-    id: "doc-90day",
-    title: "90-Day Growth Plan",
-    kind: "Plan",
-    summary:
-      "The sequence the desks are filing against: fix the floor, own the comparison layer, then compound.",
-    updated: "Week 3 of 13",
-    pages: 8,
-    sections: [
-      {
-        heading: "Phase 1 · Fix the floor (weeks 1–3)",
-        paragraphs: [
-          "Nothing else compounds while half the blog is uncrawlable and the pricing page renders client-side. The technical desk owns this phase and it is deliberately short.",
-        ],
-        bullets: [
-          "Pagination noindex removed, 190 posts resubmitted",
-          "Pricing rendered server-side in plain HTML text",
-          "Core Web Vitals: LCP under 2.5s on the top 20 landing pages",
-        ],
-      },
-      {
-        heading: "Phase 2 · Own the comparison layer (weeks 3–8)",
-        paragraphs: [
-          "Every buyer in this category runs a comparison search before they buy, and right now our rivals write those pages for us. This phase puts our own honest comparisons in front of that search, and makes them the source the answer engines quote.",
-        ],
-        bullets: [
-          "/alternatives and /compare pages for the three named rivals",
-          "Specification tables in crawlable HTML, structured for verbatim citation",
-          "Two round-up corrections filed with editors",
-          "Answer-engine sweep re-run weekly to measure share",
-        ],
-      },
-      {
-        heading: "Phase 3 · Compound (weeks 8–13)",
-        paragraphs: [
-          "With the floor fixed and the comparison layer owned, original data becomes the growth engine. One substantial research piece per month, cut down into community and social dispatches rather than written fresh.",
-        ],
-        bullets: [
-          "Monthly original-data feature from the report corpus",
-          "Each feature cut into one LinkedIn post, one X thread, two community replies",
-          "Community desks file only where the question is genuinely ours to answer",
-        ],
-      },
-      {
-        heading: "What success looks like at day 90",
-        paragraphs: [
-          "Answer share above 50% on the ten buying-intent prompts we track. Page one for six of the eight branded-alternative queries. 40 new referring domains. And the number that matters more than any of them: qualified trial starts from organic and community up 2× on the January baseline.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "doc-geo",
-    title: "Answer-Engine Playbook",
-    kind: "Playbook",
-    summary:
-      "How the GEO desk gets {{brand}} named, cited and correctly described by the models.",
-    updated: "Rewritten this month",
-    pages: 5,
-    sections: [
-      {
-        heading: "What actually moves an answer",
-        paragraphs: [
-          "Answer engines are not ranking pages, they are assembling a claim from sources they can parse and trust. Three things move the answer: being present in the round-ups the models already cite, publishing a page that answers the question in the first eighty words, and making the facts machine-readable in plain HTML.",
-          "Volume of content does not move it. We have tested this: eleven blog posts on a topic moved answer share less than one correctly structured comparison page.",
-        ],
-      },
-      {
-        heading: "The weekly sweep",
-        paragraphs: [
-          "Forty runs across ChatGPT, Perplexity, Claude and Google AI Overviews, on ten buying-intent prompts. We record which brands are named, which sources are cited, and whether our description is accurate.",
-          "The desk files a dispatch whenever named-share moves more than ten points on any prompt, or whenever a cited source about us is factually wrong.",
-        ],
-      },
-      {
-        heading: "Rendering rules",
-        paragraphs: [
-          "Anything we want quoted must exist in the server-rendered HTML. Client-rendered tables, tabbed pricing, and accordion FAQs are invisible to most crawlers used by answer engines — this is the single most common cause of a stale or wrong answer about us.",
-        ],
-        bullets: [
-          "Prices, plan names and limits in plain text, server-rendered",
-          "A dated “last updated” line on every factual page",
-          "FAQ schema on any page answering a question we want cited",
-          "One canonical URL per fact — duplicates split the citation",
-        ],
-      },
-      {
-        heading: "Correction protocol",
-        paragraphs: [
-          "When a model repeats a wrong fact about us, the fix is upstream: identify the cited source, file a factual correction with the publisher, and publish our own canonical version of the fact. Requests to the model provider do nothing. Median time from correction to changed answer, in our tracking, is nineteen days.",
-        ],
-      },
-    ],
-  },
-  {
-    id: "doc-calendar",
-    title: "Editorial Calendar",
-    kind: "Plan",
-    summary:
-      "What every desk is committed to filing over the next six weeks, and what is deliberately not on it.",
-    updated: "Reviewed Monday",
-    pages: 4,
-    sections: [
-      {
-        heading: "Standing commitments",
-        paragraphs: [
-          "The calendar is a floor, not a ceiling. Desks file opportunistically on top of it — a live Reddit thread outranks anything scheduled.",
-        ],
-        bullets: [
-          "One original-data feature per month, from the report corpus",
-          "Two comparison or alternatives pages per month until the set is complete",
-          "LinkedIn: two founder posts a week, Monday and Thursday",
-          "X: one thread a week, replies as they arise",
-          "Community desks: file only on genuine matches, no quota",
-        ],
-      },
-      {
-        heading: "Weeks 1–2",
-        paragraphs: [
-          "Technical floor work lands first, then the comparison layer opens with the rival currently taking our branded traffic.",
-        ],
-        bullets: [
-          "Pagination fix and sitemap resubmission",
-          "/alternatives page for the highest-traffic rival",
-          "Feature: “We read 200 weekly marketing reports”",
-        ],
-      },
-      {
-        heading: "Weeks 3–6",
-        paragraphs: [
-          "Comparison layer completes and the research piece gets cut down across channels rather than replaced with new writing.",
-        ],
-        bullets: [
-          "Two further /compare pages with specification tables",
-          "“Marketing report template” hub with FAQ schema",
-          "Cut-downs: one LinkedIn post and one X thread per feature",
-          "Round-up corrections filed with two editors",
-        ],
-      },
-      {
-        heading: "Deliberately not on the calendar",
-        paragraphs: [
-          "No SEO glossary, no “ultimate guide” series, no weekly newsletter. Each was tested and each cost more editorial time than it returned. If a desk files against one of these it needs a new argument, not a new draft.",
-        ],
-      },
-    ],
-  },
-];
+export const AUDIT_SCORE = {
+  score: 61,
+  pagesRead: 418,
+  seconds: 58,
+  verdict:
+    "People searching for what you sell are not finding you, and AI assistants describe you using a page you deleted last year.",
+};
 
-export const COMPETITORS: Competitor[] = [
+export const AUDIT_FINDINGS: AuditFinding[] = [
   {
-    id: "cmp-cadence",
-    name: "Cadence",
-    domain: "cadence-analytics.com",
-    positioning: "Dashboards plus per-channel forecasting for growth teams",
-    shareOfVoice: 34,
-    monthlyTraffic: "128k",
-    strength: "Owns the comparison layer — writes our alternatives page for us",
-    softSpot: "Setup takes three weeks; their own G2 reviews say so",
-  },
-  {
-    id: "cmp-ravelin",
-    name: "Ravelin",
-    domain: "ravelin.io",
-    positioning: "Enterprise marketing BI with an in-house services team",
-    shareOfVoice: 27,
-    monthlyTraffic: "96k",
-    strength: "Named first in most AI answers — heavy round-up presence",
-    softSpot: "Priced for 200+ seats; loses every deal under 50",
-  },
-  {
-    id: "cmp-northsound",
-    name: "Northsound",
-    domain: "northsound.co",
-    positioning: "Lightweight reporting for agencies and their clients",
-    shareOfVoice: 19,
-    monthlyTraffic: "54k",
-    strength: "Fast, cheap, excellent onboarding video",
-    softSpot: "No commentary layer — charts only, which is our whole wedge",
-  },
-  {
-    id: "cmp-tally",
-    name: "Tally Reports",
-    domain: "tallyreports.com",
-    positioning: "Spreadsheet-native reporting add-on",
-    shareOfVoice: 11,
-    monthlyTraffic: "31k",
-    strength: "Zero switching cost for spreadsheet-first teams",
-    softSpot: "Breaks at scale; churns into our segment at 40+ seats",
-  },
-];
-
-export const SEO_ISSUES: SeoIssue[] = [
-  {
-    id: "iss-noindex",
-    severity: "critical",
-    title: "Blog pagination serves noindex past page 2",
+    id: "af-descriptions",
+    title: "14 pages have nothing to show in search results",
     detail:
-      "A template condition meant for tag archives is applied to /blog/page/*, hiding 190 published posts from crawlers. 41 of them still rank on internal links alone.",
-    pages: 190,
-    actionLabel: "Draft fix filed · open dispatch",
-    dispatchId: "dsp-003",
-    fix: {
-      summary:
-        "Scope the noindex condition to tag archives only, then resubmit the recovered URLs.",
-      steps: [
-        "Restrict the robots meta condition to /blog/tag/* in the blog index template",
-        "Verify with a rendered fetch on /blog/page/3 — the robots tag must be absent",
-        "Regenerate sitemap.xml so the 190 recovered posts are included",
-        "Resubmit the sitemap and watch the indexed-pages count for two weeks",
-      ],
-      snippet:
-        '{/* before */}\n{isArchive && <meta name="robots" content="noindex,follow" />}\n\n{/* after */}\n{isTagArchive && <meta name="robots" content="noindex,follow" />}',
-    },
+      "Including your pricing page. Search engines are inventing a description from whatever text they find first, which on your pricing page is a table header.",
+    costing: "These 14 pages get about 3,100 views a month and almost no clicks.",
+    severity: "critical",
+    pages: 14,
+    ownerId: "beacon",
+    actionId: "act-descriptions",
   },
   {
-    id: "iss-pricing-render",
-    severity: "critical",
-    title: "Pricing table renders client-side — crawlers see an empty page",
+    id: "af-pricing-invisible",
+    title: "Your prices are invisible to AI assistants",
     detail:
-      "Plan names, prices and limits are injected after hydration. Answer engines fall back to a cached 2023 page, which is why Perplexity quotes retired pricing.",
+      "The pricing table is drawn by the browser after the page loads, so assistants read an empty page and fall back to a cached version from last year with the old numbers.",
+    costing:
+      "9 of the 12 pricing questions we asked assistants returned a price you no longer charge.",
+    severity: "critical",
     pages: 1,
-    actionLabel: "Draft fix filed · open dispatch",
-    dispatchId: "dsp-010",
-    fix: {
-      summary:
-        "Server-render the pricing table as plain HTML text with a dated last-updated line.",
-      steps: [
-        "Move plan data into a server component and render the table statically",
-        "Add a machine-readable “Pricing last updated” date under the table",
-        "Add Product and Offer schema with the current figures",
-        "Request re-crawl, then re-run the twelve pricing prompts in the answer sweep",
-      ],
-    },
+    ownerId: "beacon",
+    actionId: "act-pricing",
   },
   {
-    id: "iss-lcp",
-    severity: "warning",
-    title: "LCP above 4s on the top three landing pages",
+    id: "af-ai-absent",
+    title: "Assistants recommend three competitors and not you",
     detail:
-      "A 1.4MB hero image is served uncompressed at full resolution on mobile, and the web-font load is render-blocking on first paint.",
+      "We asked ChatGPT, Claude, Perplexity and Google's AI answers what to use for what you do, forty times. {{brand}} came up four times. The same three round-up articles are behind almost every answer, and none of them list you.",
+    costing:
+      "This is the question buyers ask first now. You are absent from it.",
+    severity: "critical",
+    pages: 0,
+    ownerId: "beacon",
+    actionId: "act-comparison",
+  },
+  {
+    id: "af-blog-hidden",
+    title: "190 of your articles cannot be found from your own site",
+    detail:
+      "Past page two, your article index tells search engines to ignore everything. 41 of those articles still get found anyway, through links from elsewhere.",
+    costing: "190 pieces of work currently returning nothing.",
+    severity: "critical",
+    pages: 190,
+    ownerId: "beacon",
+    actionId: "act-pagination",
+  },
+  {
+    id: "af-slow",
+    title: "Your three busiest pages take over four seconds to appear on a phone",
+    detail:
+      "A 1.4MB image is being sent to phones at full desktop size, and the fonts block the first paint.",
+    costing:
+      "Roughly a fifth of phone visitors leave before your page finishes loading.",
+    severity: "warning",
     pages: 3,
-    actionLabel: "Preview the fix",
-    fix: {
-      summary:
-        "Compress and size the hero correctly, preload the display face, and defer the rest.",
-      steps: [
-        "Export the hero at 2× target width in AVIF with a WebP fallback",
-        "Serve responsive sources so mobile stops downloading the desktop asset",
-        "Preload the display face and set font-display: swap on the rest",
-        "Re-measure in the field data after seven days, not in the lab",
-      ],
-    },
+    ownerId: "beacon",
   },
   {
-    id: "iss-titles",
-    severity: "warning",
-    title: "34 duplicate title tags across the blog",
+    id: "af-authority",
+    title: "The four articles other sites link to lead nowhere",
     detail:
-      "Category pages and their first paginated page share identical titles, and eleven posts inherit the site-wide default because the front-matter field is empty.",
-    pages: 34,
-    actionLabel: "Preview the fix",
-    fix: {
-      summary:
-        "Give paginated pages a page number in the title and backfill the eleven empty fields.",
-      steps: [
-        "Append “ · Page N” to titles on paginated category pages",
-        "Backfill the eleven missing front-matter titles from the H1",
-        "Add a build-time check that fails on an empty or duplicate title",
-      ],
-    },
-  },
-  {
-    id: "iss-internal-links",
+      "They are your most trusted pages and none of them link to anything you sell.",
+    costing: "Reputation arrives at your site and stops there.",
     severity: "warning",
-    title: "Highest-authority posts link nowhere useful",
-    detail:
-      "The four posts holding most of the site's external links have no internal links to any commercial page. Authority is arriving and stopping.",
     pages: 4,
-    actionLabel: "Preview the fix",
-    fix: {
-      summary:
-        "Add contextual links from the four authority posts into the comparison and hub pages.",
-      steps: [
-        "Add two in-body contextual links per post — not a related-posts widget",
-        "Point them at /compare and the template hub, not the homepage",
-        "Re-crawl and confirm the internal PageRank shift in the link graph",
-      ],
-    },
+    ownerId: "beacon",
   },
   {
-    id: "iss-alt-text",
-    severity: "notice",
-    title: "Chart images across the blog have no alt text",
+    id: "af-catalogue",
+    title: "AI shopping and research tools cannot read your product list",
     detail:
-      "62 images, most of them original data charts, ship without alt attributes. These are the assets most likely to be cited, and they are unreadable to crawlers and screen readers alike.",
-    pages: 62,
-    actionLabel: "Preview the fix",
-    fix: {
-      summary:
-        "Write descriptive alt text stating what each chart shows, not what it is called.",
-      steps: [
-        "Generate draft alt text from each chart's caption and axis labels",
-        "Rewrite drafts so each states the finding, not the file name",
-        "Add a lint rule blocking image commits without alt text",
-      ],
-    },
+      "There is no machine-readable description of what you sell, and no file telling AI tools how to use your site.",
+    costing:
+      "Tools that recommend products to buyers skip you entirely, which is a growing share of how people choose.",
+    severity: "warning",
+    pages: 0,
+    ownerId: "beacon",
   },
   {
-    id: "iss-orphans",
-    severity: "notice",
-    title: "17 orphaned pages with no inbound internal links",
+    id: "af-no-measure",
+    title: "You cannot tell where a third of your customers came from",
     detail:
-      "Mostly old campaign landing pages. Two of them still convert; the rest dilute crawl budget and should be redirected.",
-    pages: 17,
-    actionLabel: "Preview the fix",
-    fix: {
-      summary:
-        "Keep the two that convert, link them properly, and 301 the remaining fifteen.",
-      steps: [
-        "Confirm conversion data per page over the last 180 days",
-        "Link the two keepers from the resources index",
-        "301 the other fifteen to the closest live equivalent",
-      ],
-    },
+      "Traffic arriving from AI assistants has no trail, so your analytics files it as Direct. On your numbers that is 34% of everything in that bucket.",
+    costing:
+      "Every budget decision you make is being made on a third of the picture.",
+    severity: "notice",
+    pages: 0,
+    ownerId: "ledge",
   },
 ];
 
-export const KEYWORD_GAPS: KeywordGap[] = [
+/* ---------------- Onboarding: AI proposes, the human corrects ---------------- */
+
+export const ONBOARDING_QUESTIONS: OnboardingQuestion[] = [
   {
-    id: "kw-template",
-    keyword: "marketing report template",
-    volume: 4400,
-    difficulty: 22,
-    ourRank: null,
-    bestRival: { name: "Northsound", rank: 3 },
-    intent: "informational",
+    id: "q-sell",
+    question: "What do you sell?",
+    answer:
+      "Software that writes a company's weekly marketing report — pulling spend, pipeline and results into one brief a team actually reads.",
+    confidence: 92,
+    origin: "Read from your home page and pricing page",
+    multiline: true,
   },
   {
-    id: "kw-alternative",
-    keyword: "{{brand}} alternative",
-    volume: 1300,
-    difficulty: 18,
-    ourRank: 9,
-    bestRival: { name: "Cadence", rank: 4 },
-    intent: "commercial",
+    id: "q-who",
+    question: "Who buys it?",
+    answer:
+      "Heads of marketing and founders at 20–200 person B2B companies who own the weekly report and have no analyst.",
+    confidence: 78,
+    origin: "Inferred from your case studies and the language on your pricing page",
+    multiline: true,
   },
   {
-    id: "kw-weekly",
-    keyword: "weekly marketing report",
-    volume: 1900,
-    difficulty: 27,
-    ourRank: 6,
-    bestRival: { name: "Cadence", rank: 2 },
-    intent: "informational",
+    id: "q-price",
+    question: "What does it cost?",
+    answer: "$79 per seat a month, billed annually. 14-day trial, no card.",
+    confidence: 54,
+    origin: "Found two different numbers on your site. The older one is still live.",
   },
   {
-    id: "kw-automated",
-    keyword: "automated marketing reporting software",
-    volume: 880,
-    difficulty: 41,
-    ourRank: null,
-    bestRival: { name: "Ravelin", rank: 1 },
-    intent: "transactional",
+    id: "q-competitors",
+    question: "Who do you come up against?",
+    answer: "Cadence, Ravelin, Northsound",
+    confidence: 71,
+    origin: "Found by looking at who ranks and gets recommended for the same questions",
   },
   {
-    id: "kw-vs",
-    keyword: "cadence vs ravelin",
-    volume: 720,
-    difficulty: 15,
-    ourRank: null,
-    bestRival: { name: "Cadence", rank: 1 },
-    intent: "commercial",
+    id: "q-voice",
+    question: "How should you sound?",
+    answer:
+      "Plain-spoken and specific. Operator to operator. Numbers instead of adjectives, and willing to say what did not work.",
+    confidence: 66,
+    origin: "Learned from your last twelve articles",
+    multiline: true,
   },
   {
-    id: "kw-attribution",
-    keyword: "attribution window reporting",
-    volume: 590,
-    difficulty: 33,
-    ourRank: 14,
-    bestRival: { name: "Ravelin", rank: 2 },
-    intent: "informational",
+    id: "q-goal",
+    question: "What matters most right now?",
+    answer: "Qualified trial starts",
+    confidence: 48,
+    origin: "Guessed from your calls to action. Worth correcting if this is wrong.",
   },
   {
-    id: "kw-dashboard",
-    keyword: "marketing dashboard vs report",
-    volume: 480,
-    difficulty: 12,
-    ourRank: null,
-    bestRival: { name: "Northsound", rank: 5 },
-    intent: "informational",
-  },
-  {
-    id: "kw-example",
-    keyword: "marketing report example",
-    volume: 1600,
-    difficulty: 25,
-    ourRank: 18,
-    bestRival: { name: "Tally Reports", rank: 6 },
-    intent: "informational",
+    id: "q-avoid",
+    question: "Anything Emory should never say?",
+    answer:
+      "No guarantees about results. Never claim we replace an analyst. Never use the word seamless.",
+    confidence: 35,
+    origin: "Emory's default caution. Add anything specific to your market.",
+    multiline: true,
   },
 ];
 
-export const SEO_SCORES = {
-  overall: 68,
-  technical: 54,
-  content: 76,
-  authority: 71,
-  crawledPages: 4180,
-  lastCrawl: "Nightly crawl finished 04:12",
-  trend: "+6 since last week",
-};
+/* ---------------- The approval queue ---------------- */
 
-export const INTEGRATIONS: Integration[] = [
+export const SEED_ACTIONS: EmoryAction[] = [
   {
-    id: "int-ga4",
-    name: "Google Analytics 4",
-    category: "Analytics",
-    blurb: "Sessions, conversions and landing-page performance",
+    id: "act-descriptions",
+    agentId: "beacon",
+    title: "Write search descriptions for 14 pages that have none",
+    why: "These pages get about 3,100 views a month in search and almost no clicks, because there is nothing telling anyone what is on them. Your pricing page is one of them.",
+    target: "{{domain}} · 14 pages including /pricing",
+    current: null,
+    proposed:
+      "Pricing for {{brand}} — per-seat plans, what each includes, and the point at which teams usually move up. No card needed for the trial.",
+    impact: { metric: "Search clicks", estimate: "+8–14% on these pages" },
+    risk: "low",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(38),
+    kind: "page-description",
+    kindLabel: "Page descriptions",
+  },
+  {
+    id: "act-pricing",
+    agentId: "beacon",
+    title: "Publish your prices as text an assistant can read",
+    why: "Assistants read an empty page where your pricing table should be, so they quote the number you charged last year. Nine of the twelve pricing questions we tested came back wrong.",
+    target: "{{domain}}/pricing",
+    current: "Prices drawn by the browser after the page loads",
+    proposed:
+      "Same page, prices written into the page itself, with the date they were last changed. Nothing visible changes for a visitor.",
+    impact: { metric: "Correct answers about your pricing", estimate: "3 of 12 → 12 of 12" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(52),
+    kind: "page-content",
+    kindLabel: "Page content",
+  },
+  {
+    id: "act-comparison",
+    agentId: "beacon",
+    title: "Answer the comparison page Cadence wrote about you",
+    why: "Cadence published a page comparing themselves to you eleven days ago. It now sits fourth for eight searches that carry your own name, and you have no page of your own answering it.",
+    target: "{{domain}}/compare/cadence · new page",
+    current: null,
+    proposed:
+      "A comparison that concedes the two things Cadence genuinely does better, then makes the case on the three that decide it: setup time, cost at twenty seats and up, and the audit trail. Honest comparisons outrank defensive ones.",
+    impact: { metric: "Searches carrying your name", estimate: "Recover about 1,240 visits a month" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(96),
+    guard: "Checked. No claim about a competitor that cannot be evidenced.",
+    kind: "new-page",
+    kindLabel: "New pages",
+  },
+  {
+    id: "act-pagination",
+    agentId: "beacon",
+    title: "Make your 190 hidden articles findable again",
+    why: "One line in your article index tells search engines to ignore everything past page two. It was meant for tag pages only.",
+    target: "{{domain}}/blog · article index template",
+    current: "Everything past page two is marked do-not-index",
+    proposed:
+      "Restrict that instruction to tag pages, then resubmit the 190 recovered articles.",
+    impact: { metric: "Pages that can be found", estimate: "+190, of which 41 already rank" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(140),
+    kind: "site-structure",
+    kindLabel: "Site structure",
+  },
+  {
+    id: "act-stalled",
+    agentId: "forge",
+    title: "Chase 34 trials that went quiet with real usage behind them",
+    why: "Each of these people used the product properly and then stopped hearing from anyone. Median silence is twelve days. This is the largest recoverable number on your account this week.",
+    target: "34 contacts in HubSpot",
+    current: "No contact since their trial lapsed",
+    proposed:
+      "Hi Dana — you built three reports in your first week and then things went quiet, which usually means the Monday deadline got there first. If it is useful I can turn your last report into a scheduled one so it writes itself. If the timing is wrong, say so and I will stop chasing.",
+    impact: { metric: "Pipeline in reach", estimate: "$41,200 across the 34" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(64),
+    guard: "Checked. All 34 have permission on file. Three were removed as opted out.",
+    kind: "outbound-message",
+    kindLabel: "Follow-up messages",
+  },
+  {
+    id: "act-review",
+    agentId: "beacon",
+    title: "Reply to a three-star review about setup",
+    why: "It is four days old, it is the first review anyone reads, and the complaint is specific enough to answer properly.",
+    target: "G2 · review from a 40-person team",
+    current: null,
+    proposed:
+      "Thanks for writing this. The connection step you hit is genuinely slower than it should be when a workspace has more than one ad account, and we are changing it. If you tell me which platform, I will get your setup finished this week rather than waiting for the fix.",
+    impact: { metric: "Rating shown to buyers", estimate: "Replies lift conversion on this page" },
+    risk: "low",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(150),
+    kind: "review-reply",
+    kindLabel: "Review replies",
+  },
+  {
+    id: "act-afterhours",
+    agentId: "envoy",
+    title: "Answer the questions arriving after you have gone home",
+    why: "41% of your chat conversations start after 7pm or at the weekend. They currently wait until the next working morning, by which time a third of the people have gone.",
+    target: "Website chat · outside working hours",
+    current: "Out of hours, visitors get a form",
+    proposed:
+      "Answer from what Emory already knows about your product and pricing, book a call when someone is evaluating, and hand anything unclear to you with the whole conversation attached.",
+    impact: { metric: "Conversations answered within a minute", estimate: "59% → 100%" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(210),
+    kind: "conversation-policy",
+    kindLabel: "Conversation handling",
+  },
+  {
+    id: "act-alt",
+    agentId: "beacon",
+    title: "Describe 62 charts that are currently unreadable",
+    why: "These are your own data charts — the images other sites are most likely to cite — and neither a search engine nor a screen reader can tell what any of them show.",
+    target: "{{domain}}/blog · 62 images",
+    current: null,
+    proposed:
+      "Each description states what the chart shows rather than what the file is called. Example: “Share of weekly reports that open with a chart rather than a sentence, 2023 to 2026.”",
+    impact: { metric: "Citable assets", estimate: "62 charts become readable" },
+    risk: "low",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(280),
+    kind: "image-description",
+    kindLabel: "Image descriptions",
+  },
+  {
+    id: "act-questions",
+    agentId: "beacon",
+    title: "Answer the six questions buyers keep asking, on the page they ask them",
+    why: "Envoy has seen the same six questions in chat 74 times this quarter. Four of them are not answered anywhere on your site.",
+    target: "{{domain}}/pricing and /product",
+    current: null,
+    proposed:
+      "A short answer to each, in your words, structured so assistants can quote them. The most asked one is whether the numbers match what people see in their ad platforms.",
+    impact: { metric: "Questions answered before they are asked", estimate: "74 chats a quarter" },
+    risk: "low",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(300),
+    kind: "page-content",
+    kindLabel: "Page content",
+  },
+  {
+    id: "act-holdout",
+    agentId: "ledge",
+    title: "Run a four-week holdout so your numbers stop being a guess",
+    why: "A third of what your analytics calls Direct is people arriving from AI assistants with no trail. Clicks cannot tell you what worked any more, so the only honest way to know is to hold something back and measure the difference.",
+    target: "Two matched regions, four weeks",
+    current: "Last-click reporting only",
+    proposed:
+      "Pause one channel in one region while keeping it in a matched one, and read the difference in signups. You get one number with a confidence range instead of five dashboards that disagree.",
+    impact: { metric: "Revenue you can attribute honestly", estimate: "First defensible reading in 4 weeks" },
+    risk: "medium",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(330),
+    kind: "measurement",
+    kindLabel: "Measurement",
+  },
+  {
+    id: "act-redirect",
+    agentId: "beacon",
+    title: "Retire 15 old campaign pages and point them somewhere useful",
+    why: "Seventeen pages have no route in from anywhere. Two still bring in signups and should stay; the other fifteen are spending your crawl budget and confusing your own reporting.",
+    target: "{{domain}} · 15 URLs",
+    current: "Live, unlinked, no traffic",
+    proposed:
+      "Send each to its closest live equivalent. Link the two that still convert from the resources page.",
+    impact: { metric: "Wasted crawl", estimate: "15 URLs removed from circulation" },
+    risk: "high",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(420),
+    kind: "redirect",
+    kindLabel: "Address changes",
+  },
+  {
+    id: "act-budget",
+    agentId: "ledge",
+    title: "Move $2,000 a month out of paid search",
+    why: "Your branded search ads are mostly buying clicks from people who already know you and would have arrived anyway. The holdout in March showed 84% of that spend produced signups that came regardless.",
+    target: "Google Ads · brand campaign",
+    current: "$3,100 a month on brand terms",
+    proposed:
+      "Cut brand spend to $1,100 and hold the rest for four weeks before deciding where it goes. If signups drop, it goes straight back.",
+    impact: { metric: "Spend with no measurable return", estimate: "$2,000 a month" },
+    risk: "high",
+    reversible: true,
+    status: "queued",
+    createdAt: ago(500),
+    kind: "budget",
+    kindLabel: "Budget changes",
+  },
+  {
+    id: "act-profile-post",
+    agentId: "beacon",
+    title: "Post this month's update to your business profile",
+    why: "Profiles that post monthly hold their position in local results. Yours has not been updated since February.",
+    target: "Google Business Profile",
+    current: "Last post 6 months ago",
+    proposed:
+      "A short note on the reporting integrations added this quarter, with the link to the changelog.",
+    impact: { metric: "Profile views", estimate: "Typically +6% in the month after a post" },
+    risk: "low",
+    reversible: true,
+    status: "approved",
+    createdAt: ago(1_500),
+    ranAt: ago(1_400),
+    kind: "profile-post",
+    kindLabel: "Profile posts",
+  },
+  {
+    id: "act-integration-page",
+    agentId: "beacon",
+    title: "Publish the integration page fourteen people asked for",
+    why: "Fourteen trial signups this month asked in chat whether you work with one specific tool. Nobody requested this page; Emory noticed the question repeating.",
+    target: "{{domain}}/integrations/looker",
+    current: null,
+    proposed:
+      "A page answering exactly what those fourteen asked: what syncs, how often, what happens when a field is missing, and the two limits worth knowing before they start.",
+    impact: { metric: "Repeat question", estimate: "14 chats this month" },
+    risk: "medium",
+    reversible: true,
+    status: "executed",
+    createdAt: ago(4_300),
+    ranAt: ago(4_100),
+    kind: "new-page",
+    kindLabel: "New pages",
+  },
+];
+
+/** Guard produces nothing. It stops things, and it says what it stopped. */
+export const GUARD_BLOCKS = [
+  {
+    id: "gb-claim",
+    at: ago(120),
+    stopped: "“Cut your reporting time by 90%.”",
+    reason:
+      "A performance claim with no evidence behind it. Two of your markets require substantiation on file before it can be published.",
+    replacement:
+      "“Most teams send their first report in under twenty minutes.” — measured across 200 accounts, evidence attached.",
+    where: "A draft for {{domain}}/pricing",
+  },
+  {
+    id: "gb-consent",
+    at: ago(64),
+    stopped: "3 contacts removed from a 37-person follow-up",
+    reason: "They had opted out. Opt-out is honoured on every channel at once.",
+    replacement: "The remaining 34 all have permission on file, with the reason recorded.",
+    where: "Follow-up to stalled trials",
+  },
+];
+
+/* ---------------- The Brain ---------------- */
+
+export const BRAIN_GROUPS = [
+  { id: "identity", label: "What you sell", note: "The base every agent writes from." },
+  { id: "positioning", label: "How you win", note: "Value, differences, objections, proof." },
+  { id: "icp", label: "Who buys", note: "Segments, triggers, budgets, decision makers." },
+  { id: "voice", label: "How you sound", note: "Tone, vocabulary, banned phrases." },
+  { id: "competitors", label: "Who you are up against", note: "Set, positioning, gaps." },
+  { id: "assets", label: "What you own", note: "Site, pages, platform, profiles, handles." },
+  { id: "conversations", label: "What customers say", note: "Objections, questions, language." },
+  { id: "consent", label: "Permission", note: "Who Emory may contact, and how." },
+];
+
+export const BRAIN_FIELDS: BrainField[] = [
+  {
+    id: "bf-what",
+    group: "identity",
+    label: "What you sell",
+    value:
+      "Software that writes a company's weekly marketing report — spend, pipeline and results, with a paragraph explaining why each number moved.",
+    confidence: 94,
+    source: "confirmed",
+    origin: "You corrected this during setup",
+    multiline: true,
+  },
+  {
+    id: "bf-price",
+    group: "identity",
+    label: "What it costs",
+    value: "$79 per seat a month, billed annually. 14-day trial, no card.",
+    confidence: 61,
+    source: "inferred",
+    origin: "Two different prices are live on your site. Confirm which is current.",
+  },
+  {
+    id: "bf-markets",
+    group: "identity",
+    label: "Where you sell",
+    value: "United States, United Kingdom, Canada, Australia. English only.",
+    confidence: 88,
+    source: "observed",
+    origin: "From where your signups actually come from",
+  },
+  {
+    id: "bf-position",
+    group: "positioning",
+    label: "The one-line position",
+    value:
+      "{{brand}} writes the weekly marketing report your team actually reads — the numbers, and the reason each one moved, before the Monday meeting.",
+    confidence: 90,
+    source: "confirmed",
+    origin: "You wrote this during setup",
+    multiline: true,
+  },
+  {
+    id: "bf-different",
+    group: "positioning",
+    label: "What only you can say",
+    value:
+      "The written commentary. Competitors ship charts and leave the explaining to whoever opens the dashboard.",
+    confidence: 82,
+    source: "learned",
+    origin: "Learned from how your own customers describe you in calls",
+    multiline: true,
+  },
+  {
+    id: "bf-objections",
+    group: "positioning",
+    label: "What stops a deal",
+    value:
+      "1. Will the numbers match my ad platforms. 2. We already pay for a dashboard. 3. It will sound like a robot wrote it. 4. What happens when our stack changes.",
+    confidence: 86,
+    source: "learned",
+    origin: "Mined from 60 recorded calls and 74 chat conversations",
+    multiline: true,
+  },
+  {
+    id: "bf-proof",
+    group: "positioning",
+    label: "Proof you can use freely",
+    value:
+      "Median edit time before sending: 6 minutes across 200 accounts. Setup to first report: under 20 minutes.",
+    confidence: 79,
+    source: "confirmed",
+    origin: "Supplied by you. Guard allows these in published copy.",
+    multiline: true,
+  },
+  {
+    id: "bf-buyer",
+    group: "icp",
+    label: "Who signs off",
+    value:
+      "Head of marketing at a 20–200 person B2B company. Owns the weekly report, has no analyst, reports to a founder who reads the first paragraph.",
+    confidence: 84,
+    source: "confirmed",
+    origin: "Confirmed at setup, refined from your closed-won records",
+    multiline: true,
+  },
+  {
+    id: "bf-trigger",
+    group: "icp",
+    label: "What makes them start looking",
+    value:
+      "A board meeting they could not answer a question in, or a marketing hire leaving.",
+    confidence: 58,
+    source: "learned",
+    origin: "Appears in 19 of 60 call transcripts",
+  },
+  {
+    id: "bf-notfor",
+    group: "icp",
+    label: "Who you should not sell to",
+    value:
+      "Teams with an in-house analyst, agencies reselling reporting, and single-channel startups. They convert at a fifth of the rate.",
+    confidence: 72,
+    source: "observed",
+    origin: "From your own trial-to-paid data",
+    multiline: true,
+  },
+  {
+    id: "bf-tone",
+    group: "voice",
+    label: "How you sound",
+    value:
+      "Plain-spoken and specific. Operator to operator. Numbers instead of adjectives, and willing to say what did not work.",
+    confidence: 81,
+    source: "learned",
+    origin: "Learned from your last twelve articles",
+    multiline: true,
+  },
+  {
+    id: "bf-banned",
+    group: "voice",
+    label: "Never say",
+    value:
+      "Seamless. Unlock. Best-in-class. Any guarantee about results. Any claim that you replace an analyst.",
+    confidence: 95,
+    source: "confirmed",
+    origin: "Set by you. Guard blocks these before anything is written.",
+    multiline: true,
+  },
+  {
+    id: "bf-competitors",
+    group: "competitors",
+    label: "Who you are actually up against",
+    value: "Cadence, Ravelin, Northsound, Tally Reports",
+    confidence: 87,
+    source: "observed",
+    origin: "Found by who ranks and gets recommended for the same questions",
+  },
+  {
+    id: "bf-comp-gap",
+    group: "competitors",
+    label: "What they cover that you do not",
+    value:
+      "Cadence answers comparison questions about you and you have no page of your own. Ravelin is named first in most assistant answers because it appears in three round-ups you are missing from.",
+    confidence: 76,
+    source: "observed",
+    origin: "From this week's competitor sweep",
+    multiline: true,
+  },
+  {
+    id: "bf-platform",
+    group: "assets",
+    label: "How your site is built",
+    value: "Next.js on Vercel, with articles in WordPress",
+    confidence: 97,
+    source: "observed",
+    origin: "Detected during the first crawl. Decides how changes are made.",
+  },
+  {
+    id: "bf-pages",
+    group: "assets",
+    label: "Pages Emory looks after",
+    value: "418 pages, of which 190 are currently unfindable from your own site",
+    confidence: 99,
+    source: "observed",
+    origin: "Last read this morning at 04:12",
+  },
+  {
+    id: "bf-questions",
+    group: "conversations",
+    label: "What people ask before they buy",
+    value:
+      "Whether the numbers match their ad platforms (31 times), whether it works with Looker (14), whether they can edit before it sends (12), how long setup takes (9).",
+    confidence: 91,
+    source: "learned",
+    origin: "From 74 chat conversations this quarter",
+    multiline: true,
+  },
+  {
+    id: "bf-words",
+    group: "conversations",
+    label: "The words they use",
+    value:
+      "They say “the Monday report”, not “weekly reporting”. They say “the numbers disagree”, not “data discrepancy”.",
+    confidence: 74,
+    source: "learned",
+    origin: "From chat and call transcripts. Now used in published copy.",
+    multiline: true,
+  },
+  {
+    id: "bf-consent",
+    group: "consent",
+    label: "Who Emory may contact",
+    value:
+      "1,847 contacts with permission on file. 63 opted out and suppressed everywhere. Consent is recorded per person, per channel.",
+    confidence: 100,
+    source: "observed",
+    origin: "Maintained by Guard, with a full audit trail",
+    multiline: true,
+  },
+  {
+    id: "bf-jurisdiction",
+    group: "consent",
+    label: "Rules that apply to you",
+    value:
+      "US, UK, Canada, Australia. Performance claims need evidence on file in two of them before publication.",
+    confidence: 93,
+    source: "inferred",
+    origin: "From where your customers are. Guard enforces this before writing.",
+    multiline: true,
+  },
+];
+
+/** Emory updated your positioning. Here's what changed and why. */
+export const BRAIN_CHANGES: BrainChange[] = [
+  {
+    id: "bc-1",
+    at: ago(180),
+    agentId: "envoy",
+    field: "What people ask before they buy",
+    before: "Whether the numbers match their ad platforms (24 times)",
+    after: "Whether the numbers match their ad platforms (31 times)",
+    why: "Seven more people asked it this week. It is now the most common question before a purchase, and it is not answered anywhere on your site.",
+    source: "learned",
+  },
+  {
+    id: "bc-2",
+    at: ago(1_100),
+    agentId: "ledge",
+    field: "What stops a deal",
+    before: "3. Price against an existing dashboard",
+    after: "3. It will sound like a robot wrote it",
+    why: "Objection order changed after listening to eleven calls. Price fell to fifth; the fear of automated writing rose to third. Your pricing page argues against the wrong objection.",
+    source: "learned",
+  },
+  {
+    id: "bc-3",
+    at: ago(2_800),
+    agentId: "scout",
+    field: "What they cover that you do not",
+    before: "No gaps recorded",
+    after: "Cadence answers comparison questions about you and you have no page of your own",
+    why: "Cadence published a comparison page eleven days ago. It now ranks fourth for eight searches carrying your name.",
+    source: "observed",
+  },
+  {
+    id: "bc-4",
+    at: ago(4_400),
+    agentId: "beacon",
+    field: "How your site is built",
+    before: "WordPress",
+    after: "Next.js on Vercel, with articles in WordPress",
+    why: "Your marketing site moved. Changes to product pages now go through your repository as a pull request instead of the WordPress editor.",
+    source: "observed",
+  },
+  {
+    id: "bc-5",
+    at: ago(7_200),
+    agentId: "envoy",
+    field: "The words they use",
+    before: "Not recorded",
+    after: "They say “the Monday report”, not “weekly reporting”",
+    why: "Your customers use a different phrase to your website. Published copy now follows theirs.",
+    source: "learned",
+  },
+  {
+    id: "bc-6",
+    at: ago(11_000),
+    agentId: "forge",
+    field: "Who you should not sell to",
+    before: "Not recorded",
+    after: "Teams with an in-house analyst convert at a fifth of the rate",
+    why: "Read from your own closed-lost records. Emory now scores these leads lower rather than chasing them.",
+    source: "observed",
+  },
+];
+
+/* ---------------- Customers: one person, one scroll ---------------- */
+
+export const PEOPLE: Person[] = [
+  {
+    id: "p-dana",
+    name: "Dana Okonjo",
+    company: "Halden Systems",
+    role: "Head of Marketing",
+    status: "customer",
+    value: 4800,
+    score: 92,
+    firstSeen: ago(14_400),
+    lastTouch: ago(120),
+    summary:
+      "Found you through an AI assistant, read two pages, asked one integration question at 9pm, booked a call the same night.",
+    arrivedFrom: "AI assistant answer",
+  },
+  {
+    id: "p-marcus",
+    name: "Marcus Feld",
+    company: "Trellis Data",
+    role: "Founder",
+    status: "qualified",
+    value: 3200,
+    score: 78,
+    firstSeen: ago(4_300),
+    lastTouch: ago(300),
+    summary:
+      "Arrived from the comparison page, asked whether the numbers match his ad platforms, has not replied since Thursday.",
+    arrivedFrom: "Search · comparison page",
+  },
+  {
+    id: "p-sofia",
+    name: "Sofia Rehnquist",
+    company: "Northgate Labs",
+    role: "VP Growth",
+    status: "stalled",
+    value: 5600,
+    score: 64,
+    firstSeen: ago(21_000),
+    lastTouch: ago(17_280),
+    summary:
+      "Built three reports in her first trial week, then went quiet. Twelve days of silence with real usage behind it.",
+    arrivedFrom: "Referral · customer introduction",
+  },
+  {
+    id: "p-arun",
+    name: "Arun Mehta",
+    company: "Fieldnote",
+    role: "Co-founder",
+    status: "new",
+    value: 1800,
+    score: 41,
+    firstSeen: ago(180),
+    lastTouch: ago(170),
+    summary:
+      "Read the pricing page twice this morning and asked about the seat minimum in chat. Emory answered; no call booked yet.",
+    arrivedFrom: "Direct — reclassified as AI assistant",
+  },
+  {
+    id: "p-lena",
+    name: "Lena Brandt",
+    company: "Corva",
+    role: "Marketing Lead",
+    status: "customer",
+    value: 7200,
+    score: 88,
+    firstSeen: ago(43_000),
+    lastTouch: ago(2_800),
+    summary:
+      "Nine months in, usage flat for three weeks and nobody has spoken to her. Emory has a check-in prepared.",
+    arrivedFrom: "Paid search",
+  },
+  {
+    id: "p-tomas",
+    name: "Tomas Klein",
+    company: "Rivet HQ",
+    role: "Head of Demand",
+    status: "qualified",
+    value: 2400,
+    score: 71,
+    firstSeen: ago(9_100),
+    lastTouch: ago(1_500),
+    summary:
+      "Downloaded the report template, came back twice, and asked what happens when their stack changes.",
+    arrivedFrom: "Article · organic search",
+  },
+];
+
+/** The sequence the whole product exists to render. */
+export const TIMELINE: TimelineEvent[] = [
+  {
+    id: "t-1",
+    personId: "p-dana",
+    at: ago(14_400),
+    agentId: "beacon",
+    channel: "AI assistant",
+    title: "Asked an assistant what to use for weekly marketing reporting",
     detail:
-      "Feeds the impact estimates on every SEO and longform dispatch, and the referral numbers on published community filings.",
-    icon: "line-chart",
+      "{{brand}} was named, because the pages Emory restructured six weeks earlier are now what assistants read. No click was recorded anywhere — this arrival would have shown as Direct in any analytics tool.",
+  },
+  {
+    id: "t-2",
+    personId: "p-dana",
+    at: ago(14_398),
+    agentId: "ledge",
+    channel: "Website",
+    title: "Landed on the comparison page and read for four minutes",
+    detail: "Read the comparison block and the section on matching ad platform numbers.",
+  },
+  {
+    id: "t-3",
+    personId: "p-dana",
+    at: ago(14_395),
+    agentId: "envoy",
+    channel: "Website chat",
+    title: "Asked whether it works with Looker, at 9:17pm",
+    detail:
+      "Emory answered from your documentation, confirmed the integration, and offered a call. You were not online.",
+  },
+  {
+    id: "t-4",
+    personId: "p-dana",
+    at: ago(14_395),
+    agentId: "guard",
+    channel: "Consent",
+    title: "Permission checked before the first message went out",
+    detail: "Passed. Consent recorded for email and chat, with the lawful basis stored.",
+  },
+  {
+    id: "t-5",
+    personId: "p-dana",
+    at: ago(14_391),
+    agentId: "forge",
+    channel: "CRM",
+    title: "Scored hot at $4,800 a year and created in HubSpot",
+    detail:
+      "Thursday 11am booked. You were notified with the conversation attached, not just an email address.",
+    value: "$4,800 potential",
+  },
+  {
+    id: "t-6",
+    personId: "p-dana",
+    at: ago(13_000),
+    agentId: "envoy",
+    channel: "Email",
+    title: "Reminder sent with the two pages she had read",
+    detail: "She confirmed the call the same hour.",
+  },
+  {
+    id: "t-7",
+    personId: "p-dana",
+    at: ago(11_600),
+    agentId: "forge",
+    channel: "Call",
+    title: "Call happened, trial started, payment link sent on conversion",
+    detail: "Objection raised on the call: whether the numbers match ad platforms. Written back into the Brain.",
+    value: "$4,800 booked",
+  },
+  {
+    id: "t-8",
+    personId: "p-dana",
+    at: ago(8_600),
+    agentId: "beacon",
+    channel: "Review",
+    title: "Asked for a review once she had sent three reports",
+    detail: "She left one. Emory replied the same day.",
+  },
+  {
+    id: "t-9",
+    personId: "p-dana",
+    at: ago(4_320),
+    agentId: "write",
+    channel: "Website",
+    title: "Her question became a page, because thirteen others asked it too",
+    detail:
+      "Nobody requested this. Emory noticed the question repeating in chat and published the integration page.",
+  },
+  {
+    id: "t-10",
+    personId: "p-dana",
+    at: ago(120),
+    agentId: "ledge",
+    channel: "Revenue",
+    title: "$4,800 attributed to an AI assistant answer",
+    detail:
+      "A channel that shows as Direct in every analytics tool you could have bought instead.",
+    value: "$4,800 attributed",
+  },
+  {
+    id: "t-11",
+    personId: "p-marcus",
+    at: ago(4_300),
+    agentId: "beacon",
+    channel: "Search",
+    title: "Found the comparison page from a search carrying your name",
+    detail: "The page Emory published in answer to Cadence.",
+  },
+  {
+    id: "t-12",
+    personId: "p-marcus",
+    at: ago(4_290),
+    agentId: "envoy",
+    channel: "Website chat",
+    title: "Asked whether the numbers match his ad platforms",
+    detail:
+      "Emory answered with the frozen-window explanation. The question was written back into the Brain — it is now the most asked question before a purchase.",
+  },
+  {
+    id: "t-13",
+    personId: "p-marcus",
+    at: ago(4_280),
+    agentId: "forge",
+    channel: "CRM",
+    title: "Scored 78 and created in HubSpot with the conversation attached",
+    detail: "Marked as evaluating, with a follow-up due if he goes quiet for five days.",
+    value: "$3,200 potential",
+  },
+  {
+    id: "t-14",
+    personId: "p-marcus",
+    at: ago(300),
+    agentId: "forge",
+    channel: "Email",
+    title: "Five days quiet. A follow-up is waiting for your approval",
+    detail: "Drafted against what he actually asked, not a template.",
+  },
+  {
+    id: "t-15",
+    personId: "p-sofia",
+    at: ago(21_000),
+    agentId: "forge",
+    channel: "Referral",
+    title: "Introduced by an existing customer",
+    detail: "Referral is your cheapest channel and, until now, entirely unmanaged.",
+  },
+  {
+    id: "t-16",
+    personId: "p-sofia",
+    at: ago(19_000),
+    agentId: "envoy",
+    channel: "Product",
+    title: "Built three reports in the first trial week",
+    detail: "Real usage, then nothing.",
+  },
+  {
+    id: "t-17",
+    personId: "p-sofia",
+    at: ago(17_280),
+    agentId: "forge",
+    channel: "Email",
+    title: "Twelve days quiet — included in the batch of 34 awaiting approval",
+    detail: "The largest recoverable number on your account this week.",
+    value: "$5,600 in reach",
+  },
+  {
+    id: "t-18",
+    personId: "p-arun",
+    at: ago(180),
+    agentId: "ledge",
+    channel: "Website",
+    title: "Arrived with no referrer — reclassified as an AI assistant",
+    detail:
+      "Analytics filed this as Direct. Emory's own measurement identified the assistant.",
+  },
+  {
+    id: "t-19",
+    personId: "p-arun",
+    at: ago(170),
+    agentId: "envoy",
+    channel: "Website chat",
+    title: "Asked about the seat minimum",
+    detail: "Emory answered from your pricing. No call booked yet; a follow-up is scheduled for tomorrow.",
+  },
+  {
+    id: "t-20",
+    personId: "p-lena",
+    at: ago(2_800),
+    agentId: "forge",
+    channel: "Product",
+    title: "Usage flat for three weeks and nobody has spoken to her",
+    detail: "Emory has a check-in prepared, held until you approve the batch.",
+    value: "$7,200 at risk",
+  },
+  {
+    id: "t-21",
+    personId: "p-tomas",
+    at: ago(9_100),
+    agentId: "beacon",
+    channel: "Search",
+    title: "Found an article, downloaded the report template",
+    detail: "Came back twice in the following week.",
+  },
+  {
+    id: "t-22",
+    personId: "p-tomas",
+    at: ago(1_500),
+    agentId: "envoy",
+    channel: "Website chat",
+    title: "Asked what happens when their stack changes",
+    detail: "The fourth most common objection. Answered, and logged against the objection list.",
+  },
+];
+
+/* ---------------- Revenue: one number, and how it was arrived at ---------------- */
+
+export const OWNER_METRICS = [
+  { id: "leads", label: "Leads", value: "63", direction: "up" as const, note: "Last 30 days · 48 the month before" },
+  { id: "cpl", label: "Cost per lead", value: "$41", direction: "down" as const, note: "Down from $58 after the budget move" },
+  { id: "conversations", label: "Conversations", value: "212", direction: "up" as const, note: "59% of them outside working hours" },
+  { id: "revenue", label: "Revenue", value: "$38,400", direction: "up" as const, note: "Booked in the last 30 days" },
+];
+
+export const REVENUE_SOURCES: RevenueSource[] = [
+  {
+    id: "rs-ai",
+    label: "AI assistant answers",
+    revenue: 12800,
+    leads: 19,
+    note: "Would have shown as Direct in any analytics tool. Identified by Emory's own measurement.",
+    reclassified: true,
+  },
+  { id: "rs-organic", label: "Search", revenue: 11400, leads: 21, note: "Mostly the comparison and integration pages." },
+  { id: "rs-referral", label: "Referral", revenue: 6800, leads: 7, note: "Your cheapest channel, and until now unmanaged." },
+  { id: "rs-paid", label: "Paid search", revenue: 4900, leads: 11, note: "84% of brand spend produced signups that would have arrived anyway." },
+  { id: "rs-direct", label: "Direct", revenue: 2500, leads: 5, note: "What is left of Direct once assistant traffic is taken out." },
+];
+
+export const EXPERIMENTS: Experiment[] = [
+  {
+    id: "ex-brand",
+    name: "Brand search holdout",
+    method: "Paused brand ads in two matched regions for four weeks",
+    reading: "84% of brand spend produced signups that arrived anyway",
+    confidence: "High · 4 weeks, 2 regions",
+    agentId: "ledge",
+  },
+  {
+    id: "ex-comparison",
+    name: "Comparison page lift",
+    method: "Region holdout on the page published in answer to Cadence",
+    reading: "+14 signups a month attributable to the page",
+    confidence: "Medium · 3 weeks, still running",
+    agentId: "ledge",
+  },
+  {
+    id: "ex-afterhours",
+    name: "Out-of-hours answering",
+    method: "Alternating weeks with and without instant answers after 7pm",
+    reading: "Waiting on approval before it can start",
+    confidence: "Not started",
+    agentId: "envoy",
+  },
+];
+
+export const PROOF_LINES: ProofLine[] = [
+  {
+    label: "Getting found",
+    did: "Fixed 14 missing page descriptions, published one comparison page, recovered 190 hidden articles",
+    produced: "21 leads from search, up from 12",
+    separately: "Search tooling $130 + freelance time",
+  },
+  {
+    label: "Getting recommended by AI",
+    did: "Restructured the pages assistants read, corrected two stale sources",
+    produced: "19 leads and $12,800, from a channel you could not previously see",
+    separately: "No tool on the market does this",
+  },
+  {
+    label: "Answering customers",
+    did: "212 conversations handled, 74 buying questions answered, 9 calls booked",
+    produced: "Median first reply under a minute",
+    separately: "Chat tool $99 + the person answering",
+  },
+  {
+    label: "Chasing what stalled",
+    did: "Prepared 34 follow-ups on lapsed trials with real usage behind them",
+    produced: "$41,200 back in reach",
+    separately: "Nobody was doing this",
+  },
+  {
+    label: "Knowing what worked",
+    did: "Ran a brand holdout and a page lift test, reclassified a third of Direct",
+    produced: "$2,000 a month of spend identified as producing nothing",
+    separately: "Usually absent",
+  },
+  {
+    label: "Staying out of trouble",
+    did: "Stopped one performance claim before it was written, removed 3 opted-out contacts",
+    produced: "Nothing published that needs evidence you do not have",
+    separately: "Usually absent",
+  },
+];
+
+/* ---------------- Connections ---------------- */
+
+export const CONNECTORS: Connector[] = [
+  {
+    id: "cn-analytics",
+    name: "Google Analytics",
+    category: "Measurement",
+    direction: "read",
+    feeds: ["ledge", "beacon"],
+    detail: "Where visitors come from and what they do. Emory's own measurement corrects what this cannot see.",
     connected: true,
+    health: "ok",
+    healthNote: "Reading normally · last sync 11 minutes ago",
   },
   {
-    id: "int-gsc",
+    id: "cn-search",
     name: "Google Search Console",
-    category: "Search",
-    blurb: "Impressions, positions and indexation coverage",
-    detail:
-      "The search desk files rank-movement dispatches straight off this feed. Without it, ranking claims fall back to third-party estimates.",
-    icon: "search",
+    category: "Measurement",
+    direction: "read",
+    feeds: ["beacon", "scout"],
+    detail: "What people search before they reach you, and where you appear.",
     connected: true,
+    health: "ok",
+    healthNote: "Reading normally · last sync 34 minutes ago",
   },
   {
-    id: "int-wordpress",
+    id: "cn-site",
+    name: "Your website",
+    category: "Publishing",
+    direction: "both",
+    feeds: ["beacon", "write", "studio"],
+    detail: "Changes to product pages arrive in your repository as a pull request. Nothing merges without a human.",
+    connected: true,
+    health: "ok",
+    healthNote: "Next.js on Vercel · 3 changes merged this month",
+  },
+  {
+    id: "cn-wordpress",
     name: "WordPress",
     category: "Publishing",
-    blurb: "Push approved articles straight to draft",
-    detail:
-      "Approved longform dispatches arrive as drafts with title, body and meta description filled in. Nothing publishes without a human hitting publish.",
-    icon: "newspaper",
-    connected: false,
-  },
-  {
-    id: "int-linkedin",
-    name: "LinkedIn Pages",
-    category: "Social",
-    blurb: "Schedule founder and company posts",
-    detail:
-      "Approved LinkedIn dispatches queue against the Monday and Thursday slots in the editorial calendar.",
-    icon: "briefcase",
+    direction: "both",
+    feeds: ["write", "beacon"],
+    detail: "Articles arrive as drafts with everything filled in. You press publish.",
     connected: true,
+    health: "expiring",
+    healthNote: "Access expires in 6 days. Reconnect before it goes quiet.",
   },
   {
-    id: "int-x",
-    name: "X",
-    category: "Social",
-    blurb: "Post, thread and reply from the founder account",
-    detail:
-      "Required for reply dispatches — the X desk can spot the moment without it, but cannot file the reply.",
-    icon: "hash",
-    connected: false,
-  },
-  {
-    id: "int-reddit",
-    name: "Reddit",
-    category: "Community",
-    blurb: "Watch subreddits and file replies with disclosure",
-    detail:
-      "Monitors eleven subreddits for buying-intent questions. Replies always carry the affiliation line from the style sheet.",
-    icon: "messages",
-    connected: false,
-  },
-  {
-    id: "int-slack",
-    name: "Slack",
-    category: "Notifications",
-    blurb: "Urgent dispatches to your channel as they file",
-    detail:
-      "Only URGENT-stamped dispatches are pushed, so the channel stays readable. Everything else waits for the daily edition.",
-    icon: "bell",
-    connected: true,
-  },
-  {
-    id: "int-ahrefs",
-    name: "Ahrefs",
-    category: "Search",
-    blurb: "Backlinks, keyword gaps and competitor movement",
-    detail:
-      "Powers the competitor landscape table and the keyword-gap list on the audit desk.",
-    icon: "link",
-    connected: false,
-  },
-  {
-    id: "int-hubspot",
+    id: "cn-hubspot",
     name: "HubSpot",
-    category: "CRM",
-    blurb: "Close the loop from dispatch to pipeline",
-    detail:
-      "Attributes trial starts and pipeline back to the dispatch that produced them, which is how the wire scores its own desks.",
-    icon: "target",
-    connected: false,
+    category: "Pipeline",
+    direction: "both",
+    feeds: ["forge", "ledge"],
+    detail: "Emory reads your contacts and writes back scores, conversations and stage changes. Keep the CRM you have.",
+    connected: true,
+    health: "ok",
+    healthNote: "1,847 contacts in sync",
   },
   {
-    id: "int-notion",
-    name: "Notion",
-    category: "Publishing",
-    blurb: "Mirror strategy documents into your workspace",
-    detail:
-      "Keeps the positioning brief, ICP dossier and style sheet in sync so the whole team writes against the same page.",
-    icon: "file-text",
+    id: "cn-chat",
+    name: "Website chat",
+    category: "Conversations",
+    direction: "both",
+    feeds: ["envoy"],
+    detail: "The first place a visitor can ask something. Emory answers from what it knows about your product.",
+    connected: true,
+    health: "ok",
+    healthNote: "212 conversations in the last 30 days",
+  },
+  {
+    id: "cn-whatsapp",
+    name: "WhatsApp",
+    category: "Conversations",
+    direction: "both",
+    feeds: ["envoy", "forge"],
+    detail: "Through an existing provider. Message fees pass through at cost; Emory takes no margin on them.",
     connected: false,
+    health: "unavailable",
+    healthNote: "Not connected",
+  },
+  {
+    id: "cn-google-ads",
+    name: "Google Ads",
+    category: "Paid",
+    direction: "both",
+    feeds: ["media", "ledge"],
+    detail: "Emory reads performance now and will run campaigns when Media activates in April.",
+    connected: true,
+    health: "ok",
+    healthNote: "Reading only until Media activates",
+  },
+  {
+    id: "cn-meta",
+    name: "Meta Ads",
+    category: "Paid",
+    direction: "both",
+    feeds: ["media", "ledge"],
+    detail: "Approval from Meta takes several weeks, so this is started long before Media needs it.",
+    connected: false,
+    health: "unavailable",
+    healthNote: "Not connected · review takes 2–4 weeks",
+  },
+  {
+    id: "cn-profile",
+    name: "Google Business Profile",
+    category: "Presence",
+    direction: "both",
+    feeds: ["beacon"],
+    detail: "Categories, hours, photos, posts and questions. The highest-intent surface most businesses ignore.",
+    connected: true,
+    health: "ok",
+    healthNote: "1 post published this month",
+  },
+  {
+    id: "cn-linkedin",
+    name: "LinkedIn",
+    category: "Presence",
+    direction: "both",
+    feeds: ["write"],
+    detail: "Posts and replies, written by Write and delivered here. Reading works today; posting activates with Write.",
+    connected: false,
+    health: "unavailable",
+    healthNote: "Not connected",
+  },
+  {
+    id: "cn-stripe",
+    name: "Stripe",
+    category: "Revenue",
+    direction: "read",
+    feeds: ["ledge", "forge"],
+    detail: "What actually got paid. Without it, Emory can show you leads but not revenue.",
+    connected: true,
+    health: "ok",
+    healthNote: "Reading normally",
   },
 ];
 
-export const VERTICALS = [
-  "B2B SaaS · Marketing analytics",
-  "B2B SaaS · Developer tools",
-  "B2B SaaS · Fintech",
-  "E-commerce · DTC brand",
-  "Marketplace",
-  "Professional services",
+/* ---------------- Today ---------------- */
+
+export const SHIPPED_THIS_WEEK = [
+  {
+    id: "sh-1",
+    agentId: "beacon" as const,
+    title: "Published the integration page fourteen people asked for",
+    result: "Live since Tuesday · 41 views, 3 trials started",
+  },
+  {
+    id: "sh-2",
+    agentId: "beacon" as const,
+    title: "Posted this month's update to your business profile",
+    result: "Profile views up 6% week on week",
+  },
+  {
+    id: "sh-3",
+    agentId: "envoy" as const,
+    title: "Answered 212 conversations, 9 of them booked a call",
+    result: "Median first reply: 40 seconds",
+  },
+  {
+    id: "sh-4",
+    agentId: "ledge" as const,
+    title: "Reclassified 34% of Direct traffic as AI assistant answers",
+    result: "$12,800 of revenue moved to a channel you could not previously see",
+  },
 ];
 
-export const GOALS = [
-  "Qualified trial starts from organic and community channels",
-  "Demo requests from the enterprise segment",
-  "Newsletter subscribers",
-  "Share of voice against named competitors",
-  "Answer-engine citation share",
-];
-
-export const VOICE_SUGGESTIONS = [
-  "Plain-spoken",
-  "Specific",
-  "Operator-to-operator",
-  "No hype",
-  "Wry",
-  "Technical",
-  "Warm",
-  "Direct",
-  "Evidence-first",
+export const WAITING_ON = [
+  {
+    id: "wa-1",
+    agentId: "write" as const,
+    title: "Two comparison pages are drafted and waiting for Write to activate",
+    note: "Activating March. Nothing appears in your queue until it passes its readiness standard.",
+  },
+  {
+    id: "wa-2",
+    agentId: "media" as const,
+    title: "Budget recommendations are ready but Media cannot execute yet",
+    note: "Activating April. Ledge can still tell you where the money is going nowhere.",
+  },
 ];
