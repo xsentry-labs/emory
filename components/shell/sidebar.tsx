@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { DESKS } from "@/lib/mock-data";
+import { DESKS, SEO_ISSUES } from "@/lib/mock-data";
 import { deskLoad, editionStats, useWire } from "@/lib/store";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { relativeShort } from "@/lib/utils";
@@ -34,7 +34,7 @@ export function Sidebar() {
   const badgeFor = (href: string) => {
     if (!hydrated) return null;
     if (href === "/feed" && stats.pending > 0) return String(stats.pending);
-    if (href === "/seo") return "2 CRIT";
+    if (href === "/seo") return `${SEO_ISSUES.filter((issue) => issue.severity === "critical").length} CRIT`;
     if (href === "/integrations") return `${connected}/${integrations.length}`;
     return null;
   };

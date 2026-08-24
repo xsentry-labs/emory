@@ -41,8 +41,6 @@ type WireState = {
   editDraft: (id: string, body: string) => void;
   setIntegration: (id: string, connected: boolean) => void;
   updateProfile: (patch: Partial<CompanyProfile>) => void;
-  addVoiceTag: (tag: string) => void;
-  removeVoiceTag: (tag: string) => void;
   resetWire: () => void;
 };
 
@@ -184,23 +182,6 @@ export const useWire = create<WireState>()(
             log: pushLog(state.log, entry("Masthead updated from the profile desk.", "system")),
           };
         }),
-
-      addVoiceTag: (tag) =>
-        set((state) => {
-          const clean = tag.trim();
-          if (!clean || state.profile.voice.includes(clean)) return state;
-          return {
-            profile: { ...state.profile, voice: [...state.profile.voice, clean] },
-          };
-        }),
-
-      removeVoiceTag: (tag) =>
-        set((state) => ({
-          profile: {
-            ...state.profile,
-            voice: state.profile.voice.filter((item) => item !== tag),
-          },
-        })),
 
       resetWire: () => {
         const next = buildSeed(get().profile.domain);

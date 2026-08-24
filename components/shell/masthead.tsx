@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { AlertTriangle, Radio } from "lucide-react";
 import { editionStats, useWire } from "@/lib/store";
 import { useHydrated } from "@/hooks/use-hydrated";
-import { cn, editionDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { EditionDate } from "@/components/common/edition-date";
 import { Badge } from "@/components/ui/badge";
 import { NAV_ITEMS } from "./nav-items";
 
@@ -20,7 +21,7 @@ export function Masthead() {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-paper/90 backdrop-blur">
       <div className="flex items-center justify-between gap-4 px-4 py-3 md:px-8 md:py-4">
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 flex-1 items-center gap-4">
           <Link
             href="/feed"
             className="shrink-0 rounded font-display text-2xl font-bold leading-none tracking-tighter text-ink md:hidden"
@@ -29,7 +30,7 @@ export function Masthead() {
           </Link>
           <div className="hidden min-w-0 md:block">
             <p className="font-mono text-2xs uppercase tracking-stamp text-slate">
-              {editionDate()} · VOL. IV · NO. 231
+              <EditionDate suffix="· VOL. IV · NO. 231" />
             </p>
             <p className="mt-1 font-display text-xl font-semibold leading-none tracking-tight text-ink">
               {section?.label ?? "The Daily Growth Wire"}
@@ -37,9 +38,9 @@ export function Masthead() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-3">
+        <div className="flex shrink-0 items-center gap-2 md:gap-3">
           {hydrated && stats.urgent > 0 ? (
-            <Link href="/feed?filter=pending" className="rounded-sm">
+            <Link href="/feed?filter=pending" className="hidden rounded-sm sm:block">
               <Badge variant="urgent" className="gap-1.5">
                 <AlertTriangle className="h-3 w-3" />
                 {stats.urgent} urgent
@@ -53,7 +54,7 @@ export function Masthead() {
             )}
           >
             <Radio className="h-3.5 w-3.5 shrink-0 animate-pulse-dot text-teletype-green" />
-            <span className="font-mono text-2xs uppercase tracking-wire text-slate">
+            <span className="hidden font-mono text-2xs uppercase tracking-wire text-slate sm:inline">
               Filing for:
             </span>
             <span className="max-w-[9rem] truncate font-mono text-2xs uppercase tracking-wire text-ink group-hover:underline">

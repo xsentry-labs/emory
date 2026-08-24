@@ -44,7 +44,7 @@ export function MobileNav() {
                   ) : null}
                 </span>
                 <span className="font-mono text-[9px] uppercase tracking-wire">
-                  {item.label.split(" ")[0]}
+                  {item.short}
                 </span>
               </Link>
             </li>

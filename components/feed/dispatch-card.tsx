@@ -115,13 +115,13 @@ export function DispatchCard({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card/92 backdrop-blur-[1px]"
+            className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-card/95 backdrop-blur-[2px]"
           >
             <motion.span
               initial={reduced ? false : { scale: 1.6, rotate: -16, opacity: 0 }}
               animate={{ scale: 1, rotate: -7, opacity: 1 }}
               transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-              className="rounded border-[3px] border-teletype-green px-4 py-1.5 font-mono text-lg font-semibold uppercase tracking-stamp text-teletype-green"
+              className="rounded border-[3px] border-teletype-green px-6 py-2 font-mono text-2xl font-semibold uppercase tracking-stamp text-teletype-green"
             >
               Approved
             </motion.span>

@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DESKS } from "@/lib/mock-data";
 import { useWire } from "@/lib/store";
-import { cn, editionDate, isValidDomain, normalizeDomain } from "@/lib/utils";
+import { cn, isValidDomain, normalizeDomain } from "@/lib/utils";
+import { EditionDate } from "@/components/common/edition-date";
 
 const STAGES = [
   { label: "Reading your site…", detail: "4,180 URLs · sitemap, nav, pricing, blog" },
@@ -63,16 +64,16 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-paper newsprint">
-      <div className="mx-auto grid min-h-screen max-w-7xl grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_0.9fr]">
         {/* Left: the counter where you hand over the domain. */}
-        <div className="flex flex-col justify-between border-line px-6 py-10 md:px-12 md:py-14 lg:border-r">
+        <div className="flex flex-col justify-between border-line px-6 py-10 md:px-12 md:py-14 lg:border-r lg:pl-16">
           <div>
             <p className="font-display text-6xl font-bold leading-none tracking-tighter text-ink md:text-7xl">
               emory
             </p>
             <div className="rule-double mt-4" />
             <p className="mt-3 font-mono text-2xs uppercase tracking-stamp text-slate">
-              The Daily Growth Wire · {editionDate()}
+              The Daily Growth Wire · <EditionDate />
             </p>
           </div>
 

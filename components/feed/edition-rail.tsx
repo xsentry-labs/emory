@@ -7,7 +7,8 @@ import { toast } from "@/hooks/use-toast";
 import { DESKS } from "@/lib/mock-data";
 import { deskLoad, editionStats, useWire } from "@/lib/store";
 import type { Dispatch } from "@/lib/types";
-import { cn, editionDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { EditionDate } from "@/components/common/edition-date";
 
 export function EditionRail({ dispatches }: { dispatches: Dispatch[] }) {
   const restore = useWire((state) => state.restore);
@@ -33,7 +34,7 @@ export function EditionRail({ dispatches }: { dispatches: Dispatch[] }) {
             Today&apos;s Edition
           </p>
           <p className="mt-1 font-mono text-2xs uppercase tracking-wire text-slate">
-            {editionDate()}
+            <EditionDate />
           </p>
         </header>
 
