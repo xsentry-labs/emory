@@ -1,62 +1,102 @@
 import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * Our type scale and colour tokens are custom, so tailwind-merge has to be
+ * told about them — otherwise it reads `text-paper` as a font size and drops
+ * it when a size class is merged in beside it.
+ */
+const FONT_SIZES = [
+  "caption",
+  "sm",
+  "body",
+  "lead",
+  "h3",
+  "h2",
+  "section",
+  "display",
+  "hero",
+];
+
+const COLORS = [
+  "ink",
+  "paper",
+  "wash",
+  "line",
+  "mute",
+  {
+    agent: [
+      "audit",
+      "scout",
+      "beacon",
+      "write",
+      "studio",
+      "media",
+      "envoy",
+      "forge",
+      "hunt",
+      "ledge",
+      "guard",
+    ],
+  },
+];
+
+const twMerge = extendTailwindMerge({
+  override: {
+    classGroups: {
+      "font-size": [{ text: FONT_SIZES }],
+    },
+  },
+  extend: {
+    classGroups: {
+      "text-color": [{ text: COLORS }],
+      "bg-color": [{ bg: COLORS }],
+      "border-color": [{ border: COLORS }],
+      "ring-color": [{ ring: COLORS }],
+    },
+  },
+});
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** "14 Mar 2026" — masthead edition line. */
-export function editionDate(date: Date = new Date()) {
-  return date
-    .toLocaleDateString("en-GB", {
-      weekday: "long",
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    })
-    .toUpperCase();
+export function money(value: number) {
+  return `$${value.toLocaleString("en-US")}`;
 }
 
-/** Wire-desk filing stamp: "09:42 · TODAY" / "17:08 · 2 DAYS AGO". */
-export function filedAt(iso: string) {
-  const then = new Date(iso);
-  const time = then.toLocaleTimeString("en-GB", {
+/** "9:17pm, Tuesday" — how a person would say it. */
+export function whenLong(iso: string) {
+  const date = new Date(iso);
+  return date.toLocaleString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
     hour: "2-digit",
     minute: "2-digit",
   });
-  const days = Math.floor((Date.now() - then.getTime()) / 86_400_000);
-  if (days <= 0) return `${time} · TODAY`;
-  if (days === 1) return `${time} · YESTERDAY`;
-  if (days < 7) return `${time} · ${days} DAYS AGO`;
-  return then
-    .toLocaleDateString("en-GB", { day: "2-digit", month: "short" })
-    .toUpperCase();
 }
 
-/** Minutes-ago badge for the wire ticker. */
-export function relativeShort(iso: string) {
-  const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.round(hours / 24)}d`;
+export function whenShort(iso: string) {
+  const minutes = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60_000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.round(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return `${Math.round(days / 30)}mo ago`;
 }
 
-/** Accepts "acme.com", "www.acme.com", "https://acme.com/pricing" — returns the bare host. */
-export function normalizeDomain(input: string) {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, "")
-    .replace(/^www\./, "")
-    .replace(/\/.*$/, "");
+export function confidenceLabel(confidence: number) {
+  if (confidence >= 90) return "Certain";
+  if (confidence >= 70) return "Confident";
+  if (confidence >= 50) return "Unsure";
+  return "Guessing";
 }
 
-export function isValidDomain(input: string) {
-  const host = normalizeDomain(input);
-  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && host.length <= 253;
-}
-
-export function titleCase(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
+export const SOURCE_LABEL: Record<string, string> = {
+  inferred: "Read from your site",
+  confirmed: "Confirmed by you",
+  learned: "Learned from conversations",
+  observed: "Observed from results",
+};

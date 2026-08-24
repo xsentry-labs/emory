@@ -3,227 +3,273 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  DESKS,
-  INTEGRATIONS,
-  SEED_DISPATCHES,
-  SEED_PROFILE,
-  brandFromDomain,
+  BRAIN_CHANGES,
+  BRAIN_FIELDS,
+  CONNECTORS,
+  SEED_ACTIONS,
+  SEED_WORKSPACE,
+  companyFromDomain,
   hydrate,
 } from "./mock-data";
 import type {
-  CompanyProfile,
-  DeskId,
-  Dispatch,
-  DispatchStatus,
-  Integration,
+  ActionStatus,
+  AgentId,
+  BrainChange,
+  BrainField,
+  Connector,
+  EmoryAction,
+  Workspace,
 } from "./types";
-import { normalizeDomain } from "./utils";
 
-export type WireLogEntry = {
-  id: string;
-  text: string;
-  at: string;
-  tone: "filed" | "approved" | "live" | "spiked" | "edited" | "system";
-};
+export function normalizeDomain(input: string) {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "");
+}
 
-type WireState = {
+export function isValidDomain(input: string) {
+  const host = normalizeDomain(input);
+  return /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host) && host.length <= 253;
+}
+
+type EmoryState = {
+  /** Audit runs without an account; onboarded means a workspace exists. */
+  audited: boolean;
   onboarded: boolean;
-  profile: CompanyProfile;
-  dispatches: Dispatch[];
-  integrations: Integration[];
-  log: WireLogEntry[];
+  workspace: Workspace;
+  actions: EmoryAction[];
+  brain: BrainField[];
+  changes: BrainChange[];
+  connectors: Connector[];
+  /** Autonomy is granted per action type, per customer. */
+  autonomy: Record<string, boolean>;
 
-  seed: (rawDomain: string) => void;
+  runAudit: (domain: string) => void;
+  finishOnboarding: (answers: Record<string, string>) => void;
   approve: (id: string) => void;
-  pushLive: (id: string) => void;
-  spike: (id: string) => void;
-  restore: (id: string) => void;
-  editDraft: (id: string, body: string) => void;
-  setIntegration: (id: string, connected: boolean) => void;
-  updateProfile: (patch: Partial<CompanyProfile>) => void;
-  resetWire: () => void;
+  decline: (id: string) => void;
+  undo: (id: string) => void;
+  editProposed: (id: string, proposed: string) => void;
+  promoteKind: (kind: string) => void;
+  demoteKind: (kind: string) => void;
+  updateBrainField: (id: string, value: string) => void;
+  setConnector: (id: string, connected: boolean) => void;
+  reset: () => void;
 };
 
-const DEFAULT_DOMAIN = "northbeam.io";
+const DEFAULT_DOMAIN = "halden.io";
 
-function buildSeed(rawDomain: string) {
+function seedFor(rawDomain: string) {
   const domain = normalizeDomain(rawDomain) || DEFAULT_DOMAIN;
-  const brand = brandFromDomain(domain);
+  const company = companyFromDomain(domain);
   return {
-    profile: { ...hydrate(SEED_PROFILE, brand, domain), domain, brand },
-    dispatches: hydrate(SEED_DISPATCHES, brand, domain),
-    integrations: INTEGRATIONS.map((integration) => ({ ...integration })),
+    workspace: { ...hydrate(SEED_WORKSPACE, company, domain), domain, company },
+    actions: hydrate(SEED_ACTIONS, company, domain),
+    brain: hydrate(BRAIN_FIELDS, company, domain),
+    changes: hydrate(BRAIN_CHANGES, company, domain),
+    connectors: CONNECTORS.map((connector) => ({ ...connector })),
   };
 }
 
-const initial = buildSeed(DEFAULT_DOMAIN);
-
-function entry(text: string, tone: WireLogEntry["tone"]): WireLogEntry {
-  return {
-    id: `log-${Math.random().toString(36).slice(2, 9)}`,
-    text,
-    at: new Date().toISOString(),
-    tone,
-  };
-}
-
-/** Newest first, capped — the sidebar ticker only ever shows a handful. */
-function pushLog(log: WireLogEntry[], next: WireLogEntry) {
-  return [next, ...log].slice(0, 24);
-}
+const initial = seedFor(DEFAULT_DOMAIN);
 
 function setStatus(
-  dispatches: Dispatch[],
+  actions: EmoryAction[],
   id: string,
-  status: DispatchStatus,
-): Dispatch[] {
-  return dispatches.map((dispatch) =>
-    dispatch.id === id ? { ...dispatch, status } : dispatch,
+  status: ActionStatus,
+  ranAt?: string,
+): EmoryAction[] {
+  return actions.map((action) =>
+    action.id === id ? { ...action, status, ranAt } : action,
   );
 }
 
-export const useWire = create<WireState>()(
+function change(
+  field: string,
+  before: string,
+  after: string,
+  why: string,
+  agentId: AgentId,
+): BrainChange {
+  return {
+    id: `bc-${Math.random().toString(36).slice(2, 9)}`,
+    at: new Date().toISOString(),
+    agentId,
+    field,
+    before,
+    after,
+    why,
+    source: "confirmed",
+  };
+}
+
+export const useEmory = create<EmoryState>()(
   persist(
     (set, get) => ({
+      audited: false,
       onboarded: false,
-      profile: initial.profile,
-      dispatches: initial.dispatches,
-      integrations: initial.integrations,
-      log: [entry("Wire initialised. Desks standing by.", "system")],
+      workspace: initial.workspace,
+      actions: initial.actions,
+      brain: initial.brain,
+      changes: initial.changes,
+      connectors: initial.connectors,
+      autonomy: {},
 
-      seed: (rawDomain) => {
-        const next = buildSeed(rawDomain);
-        set({
-          onboarded: true,
-          ...next,
-          log: [
-            entry(`${next.dispatches.length} dispatches filed on ${next.profile.domain}.`, "filed"),
-            entry(`All ${DESKS.length} desks connected to ${next.profile.domain}.`, "system"),
-          ],
+      runAudit: (rawDomain) => {
+        const next = seedFor(rawDomain);
+        set({ audited: true, ...next });
+      },
+
+      finishOnboarding: (answers) => {
+        set((state) => {
+          const brain = state.brain.map((field) => {
+            const answer = answers[field.id];
+            if (answer === undefined || answer === field.value) return field;
+            return {
+              ...field,
+              value: answer,
+              confidence: 100,
+              source: "confirmed" as const,
+              origin: "You corrected this during setup",
+            };
+          });
+          return { onboarded: true, brain };
         });
       },
 
       approve: (id) => {
-        const dispatch = get().dispatches.find((item) => item.id === id);
-        if (!dispatch) return;
+        const action = get().actions.find((item) => item.id === id);
+        if (!action) return;
         set((state) => ({
-          dispatches: setStatus(state.dispatches, id, "approved"),
-          log: pushLog(state.log, entry(`Approved: ${dispatch.headline}`, "approved")),
+          actions: setStatus(
+            state.actions,
+            id,
+            "approved",
+            new Date().toISOString(),
+          ),
         }));
+        // Approved work runs shortly after; the queue shows it as done.
+        window.setTimeout(() => {
+          set((state) => ({
+            actions: state.actions.map((item) =>
+              item.id === id && item.status === "approved"
+                ? { ...item, status: "executed" }
+                : item,
+            ),
+          }));
+        }, 2_200);
       },
 
-      pushLive: (id) => {
-        const dispatch = get().dispatches.find((item) => item.id === id);
-        if (!dispatch) return;
-        set((state) => ({
-          dispatches: setStatus(state.dispatches, id, "live"),
-          log: pushLog(state.log, entry(`Running on the wire: ${dispatch.headline}`, "live")),
-        }));
-      },
+      decline: (id) => set((state) => ({ actions: setStatus(state.actions, id, "declined") })),
 
-      spike: (id) => {
-        const dispatch = get().dispatches.find((item) => item.id === id);
-        if (!dispatch) return;
+      undo: (id) =>
         set((state) => ({
-          dispatches: setStatus(state.dispatches, id, "spiked"),
-          log: pushLog(state.log, entry(`Spiked: ${dispatch.headline}`, "spiked")),
-        }));
-      },
+          actions: state.actions.map((item) =>
+            item.id === id ? { ...item, status: "queued", ranAt: undefined } : item,
+          ),
+        })),
 
-      restore: (id) => {
+      editProposed: (id, proposed) =>
         set((state) => ({
-          dispatches: setStatus(state.dispatches, id, "pending"),
-          log: pushLog(state.log, entry("Dispatch pulled back from the spike.", "filed")),
-        }));
-      },
+          actions: state.actions.map((item) =>
+            item.id === id ? { ...item, proposed, edited: true } : item,
+          ),
+        })),
 
-      editDraft: (id, body) => {
-        const dispatch = get().dispatches.find((item) => item.id === id);
-        if (!dispatch) return;
+      /** Low-risk work only: everything queued of this type runs from now on. */
+      promoteKind: (kind) =>
         set((state) => ({
-          dispatches: state.dispatches.map((item) =>
-            item.id === id
-              ? { ...item, body, editedAt: new Date().toISOString() }
+          autonomy: { ...state.autonomy, [kind]: true },
+          actions: state.actions.map((item) =>
+            item.kind === kind && item.risk === "low" && item.status === "queued"
+              ? { ...item, status: "executed", ranAt: new Date().toISOString() }
               : item,
           ),
-          log: pushLog(state.log, entry(`Draft revised: ${dispatch.headline}`, "edited")),
-        }));
-      },
+        })),
 
-      setIntegration: (id, connected) => {
-        const integration = get().integrations.find((item) => item.id === id);
-        if (!integration) return;
+      demoteKind: (kind) =>
+        set((state) => ({ autonomy: { ...state.autonomy, [kind]: false } })),
+
+      updateBrainField: (id, value) => {
+        const field = get().brain.find((item) => item.id === id);
+        if (!field || field.value === value) return;
         set((state) => ({
-          integrations: state.integrations.map((item) =>
-            item.id === id ? { ...item, connected } : item,
+          brain: state.brain.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  value,
+                  confidence: 100,
+                  source: "confirmed",
+                  origin: "You corrected this",
+                }
+              : item,
           ),
-          log: pushLog(
-            state.log,
-            entry(
-              `${integration.name} ${connected ? "connected" : "disconnected"}.`,
-              "system",
+          changes: [
+            change(
+              field.label,
+              field.value,
+              value,
+              "You corrected this. Every agent writes from it immediately.",
+              "ledge",
             ),
-          ),
+            ...state.changes,
+          ].slice(0, 40),
         }));
       },
 
-      updateProfile: (patch) =>
-        set((state) => {
-          const domain = patch.domain
-            ? normalizeDomain(patch.domain)
-            : state.profile.domain;
-          return {
-            profile: {
-              ...state.profile,
-              ...patch,
-              domain,
-              brand: patch.brand ?? brandFromDomain(domain),
-            },
-            log: pushLog(state.log, entry("Masthead updated from the profile desk.", "system")),
-          };
-        }),
+      setConnector: (id, connected) =>
+        set((state) => ({
+          connectors: state.connectors.map((item) =>
+            item.id === id
+              ? {
+                  ...item,
+                  connected,
+                  health: connected ? "ok" : "unavailable",
+                  healthNote: connected
+                    ? "Connected just now · first read within the hour"
+                    : "Not connected",
+                }
+              : item,
+          ),
+        })),
 
-      resetWire: () => {
-        const next = buildSeed(get().profile.domain);
-        set({
-          ...next,
-          onboarded: true,
-          log: [entry("Wire reset. Desks re-filed the morning edition.", "system")],
-        });
+      reset: () => {
+        const next = seedFor(get().workspace.domain);
+        set({ ...next, audited: true, onboarded: true, autonomy: {} });
       },
     }),
-    {
-      name: "emory-wire-v1",
-      version: 1,
-    },
+    { name: "emory-v2", version: 2 },
   ),
 );
 
 /* ---------- selectors ---------- */
 
-export const selectVisible = (state: WireState) =>
-  state.dispatches.filter((dispatch) => dispatch.status !== "spiked");
+export const queued = (actions: EmoryAction[]) =>
+  actions.filter((action) => action.status === "queued");
 
-export function editionStats(dispatches: Dispatch[]) {
-  const visible = dispatches.filter((item) => item.status !== "spiked");
+export const done = (actions: EmoryAction[]) =>
+  actions.filter((action) => action.status === "approved" || action.status === "executed");
+
+export function queueSummary(actions: EmoryAction[]) {
+  const open = queued(actions);
   return {
-    filed: visible.length,
-    pending: visible.filter((item) => item.status === "pending").length,
-    approved: visible.filter((item) => item.status === "approved").length,
-    live: visible.filter((item) => item.status === "live").length,
-    spiked: dispatches.filter((item) => item.status === "spiked").length,
-    urgent: visible.filter(
-      (item) => item.priority === "urgent" && item.status === "pending",
-    ).length,
+    queued: open.length,
+    high: open.filter((action) => action.risk === "high").length,
+    low: open.filter((action) => action.risk === "low").length,
+    done: done(actions).length,
+    declined: actions.filter((action) => action.status === "declined").length,
   };
 }
 
-export function deskLoad(dispatches: Dispatch[]) {
-  const load = {} as Record<DeskId, number>;
-  for (const desk of DESKS) load[desk.id] = 0;
-  for (const dispatch of dispatches) {
-    if (dispatch.status === "spiked") continue;
-    load[dispatch.deskId] = (load[dispatch.deskId] ?? 0) + 1;
+export function agentLoad(actions: EmoryAction[]) {
+  const load: Partial<Record<AgentId, number>> = {};
+  for (const action of actions) {
+    if (action.status !== "queued") continue;
+    load[action.agentId] = (load[action.agentId] ?? 0) + 1;
   }
   return load;
 }
