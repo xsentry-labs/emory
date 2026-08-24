@@ -14,7 +14,7 @@ export default function LandingPage() {
       <header className="border-b border-line">
         <div className="mx-auto flex h-16 max-w-shell items-center justify-between px-6">
           <span className="font-display text-h3 font-semibold text-ink">Emory</span>
-          <span className="text-caption text-mute">M-emory, by X-Sentry Labs</span>
+          <span className="text-caption text-mute">M-emory, by xsentry labs</span>
         </div>
       </header>
 
@@ -148,7 +148,7 @@ export default function LandingPage() {
 
       <footer className="border-t border-line">
         <div className="mx-auto flex max-w-shell flex-col gap-2 px-6 py-8 text-caption text-mute sm:flex-row sm:items-center sm:justify-between">
-          <span>Emory · M-emory, by X-Sentry Labs</span>
+          <span>Emory · M-emory, by xsentry labs</span>
           <span>
             Prototype ·{" "}
             <Link href="/audit" className="underline-offset-4 hover:text-ink hover:underline">
