@@ -1,0 +1,101 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --paper: 40 28% 91%;
+    --card: 0 0% 100%;
+    --ink: 223 11% 12%;
+    --ink-soft: 220 5% 37%;
+    --slate: 218 5% 44%;
+    --line: 42 26% 82%;
+    --wire-red: 0 74% 40%;
+    --teletype-green: 150 40% 31%;
+    --desk-gold: 43 89% 35%;
+    --desk-navy: 212 51% 36%;
+    --desk-purple: 263 33% 45%;
+    --desk-orange: 30 100% 36%;
+    --desk-teal: 186 59% 30%;
+    --ring: 223 11% 12%;
+  }
+
+  * {
+    border-color: hsl(var(--line));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+    font-feature-settings: "cv05" 1, "ss01" 1;
+  }
+
+  /* One focus treatment everywhere: a hard ink rule offset from the control. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
+  }
+
+  ::selection {
+    background: hsl(var(--ink));
+    color: hsl(var(--paper));
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--line));
+    border: 3px solid hsl(var(--paper));
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--slate) / 0.6);
+  }
+}
+
+@layer components {
+  /* Mono utility lockup used for desk tags, timestamps, labels, stat numerals. */
+  .wire-label {
+    @apply font-mono text-2xs uppercase tracking-wire text-slate;
+  }
+  .wire-label-strong {
+    @apply font-mono text-2xs uppercase tracking-wire text-ink;
+  }
+  .rule {
+    @apply border-t border-line;
+  }
+  .rule-double {
+    border-top: 3px double hsl(var(--line));
+  }
+  .sheet {
+    @apply rounded-lg border border-line/70 bg-card shadow-sheet;
+  }
+  .newsprint {
+    background-image: radial-gradient(
+      hsl(var(--ink) / 0.035) 1px,
+      transparent 1px
+    );
+    background-size: 3px 3px;
+  }
+  .headline-link {
+    @apply decoration-line decoration-2 underline-offset-4 hover:underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
