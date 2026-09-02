@@ -66,7 +66,7 @@ export function UrlField({
         role={error ? "alert" : undefined}
         className={cn("mt-2 text-caption", error ? "text-agent-guard" : "text-mute")}
       >
-        {error ?? "No signup. Results in 60 seconds."}
+        {error ?? "No signup. Takes a minute or two, depending on site size."}
       </p>
     </form>
   );

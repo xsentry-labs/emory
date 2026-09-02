@@ -7,9 +7,25 @@ One brain that learns your business and never forgets it.
 
 This is a clickable product prototype built against the three canon documents —
 *Strategy & Architecture v4.0*, *Agent Architecture v1.0* and the *Positioning &
-Messaging Bible v1.0*. **Mock data only**: no backend, no auth, no external
-calls. Every interaction is real and stateful, and state survives navigation and
-a page reload (localStorage).
+Messaging Bible v1.0*. **Mock data by default**: no auth, no external calls
+beyond `/audit` (see below). Every interaction is real and stateful, and state
+survives navigation and a page reload (localStorage).
+
+A real backend for the Audit agent — an actual multi-agent SEO/GEO/AEO crawl
+and audit pipeline, a human approval gate, and a coding agent that opens
+GitHub PRs for approved fixes, all via OpenRouter — lives in [`backend/`](backend/README.md)
+and deploys separately (Railway). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
+how it's designed and why.
+
+**`/audit` is wired to it and no longer uses mock data.** Set
+`NEXT_PUBLIC_API_BASE_URL` to a running backend (see below) and the audit
+screen runs a real crawl, shows real findings and suggestions, and lets you
+approve/reject and apply them (opening a real GitHub PR, or writing a local
+patch if no repo is configured). Every other screen (`/approvals`, `/brain`,
+`/customers`, `/revenue`, `/connections`, `/agents`, `/today`) still renders
+`lib/mock-data.ts` — they cover product surface (CRM, ad spend, reviews,
+attribution) this backend doesn't implement, so wiring them up is a separate,
+later piece of work.
 
 ## Run it
 
@@ -24,6 +40,23 @@ Start at `/`, put any domain into the field (`acme.com` or
 `https://acme.com/pricing`, both work). The domain and company name are
 substituted through the analysis, the Brain, the queue and the timeline, so the
 whole prototype reads as if it were built for that site.
+
+To make `/audit` real instead of erroring on "could not reach the audit
+backend," also run the backend and point the frontend at it:
+
+```bash
+# terminal 1
+cd backend && npm install && cp .env.example .env   # fill in OPENROUTER_API_KEY
+npm run dev      # http://localhost:8787
+
+# terminal 2, from the repo root
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8787 npm run dev
+```
+
+See [`backend/README.md`](backend/README.md) for what's required vs. optional
+and [`ARCHITECTURE.md`](ARCHITECTURE.md) for how it all fits together. In
+production, set `NEXT_PUBLIC_API_BASE_URL` on the Vercel project to your
+deployed Railway backend's URL.
 
 ## Deploy to Vercel
 
@@ -60,7 +93,7 @@ URL Vercel comments on it).
 | Route | What it is |
 | --- | --- |
 | `/` | The landing page. One field, one action. Eleven agents on the same screen as the claim, the customer timeline as a worked example, an interactive replacement calculator, pricing. |
-| `/audit` | **Emory Audit** — free, no signup. Visible analysis, a health score, findings written in business language with what each is costing, and the agent that repairs each one. Audit never fixes anything. Email is asked for after the value, never before. |
+| `/audit` | **Emory Audit** — free, no signup. Runs a real crawl + multi-agent audit against [`backend/`](backend/README.md) (Firecrawl or an open-source fallback crawler, real technical/on-page/GEO-AEO/performance/E-E-A-T checks), shows a health score and evidence-backed findings, and lets you approve suggested fixes and apply them as a GitHub PR. Audit never fixes anything without approval. Email is asked for after the value, never before. |
 | `/onboarding` | Three steps: correct what Emory inferred (least certain first, never a blank form), connect what you already use (skippable, degrades gracefully), then the first queue of things to approve. |
 
 **Inside the account**
