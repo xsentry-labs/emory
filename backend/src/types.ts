@@ -39,7 +39,7 @@ export interface Evidence {
 
 export interface AuditFinding {
   id: string;
-  agent: "technical" | "onpage" | "geo-aeo" | "performance" | "eeat";
+  agent: "technical" | "onpage" | "geo-aeo" | "performance" | "eeat" | "ai-visibility";
   title: string;
   detail: string;
   evidence: Evidence[];

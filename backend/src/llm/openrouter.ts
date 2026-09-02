@@ -32,6 +32,14 @@ export interface CompleteOptions {
   json?: boolean;
   maxTokens?: number;
   temperature?: number;
+  /**
+   * Overrides the tier's default model with a specific OpenRouter model id.
+   * `tier` still governs cost-ceiling bookkeeping and the logged usage
+   * entry's `tier` field — this is for callers that deliberately need a
+   * *specific* model (AI visibility checking what several distinct model
+   * families each say), not a routing decision.
+   */
+  model?: string;
   /** Called with a usage log entry after the call completes. Wire this to a run's cost tracker. */
   onUsage?: (log: ModelCallLog) => void;
 }
@@ -42,7 +50,7 @@ export interface CompleteOptions {
  * in one place.
  */
 export async function complete(opts: CompleteOptions): Promise<string> {
-  const model = modelForTier(opts.tier);
+  const model = opts.model ?? modelForTier(opts.tier);
   const openai = getClient();
 
   const res = await openai.chat.completions.create({

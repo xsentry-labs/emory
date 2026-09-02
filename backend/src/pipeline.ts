@@ -7,17 +7,27 @@ import { runOnPageAudit } from "./audit/onpage.js";
 import { runGeoAeoAudit } from "./audit/geoAeo.js";
 import { runPerformanceAudit } from "./audit/pagespeed.js";
 import { runEeatAudit } from "./audit/eeat.js";
+import { runAiVisibilityAudit } from "./audit/aiVisibility.js";
 import { buildDocStore } from "./rag/docStore.js";
 import { synthesize } from "./synth/synthesizer.js";
 import { computeScore, renderMarkdown } from "./synth/report.js";
 import { bindCostTracker } from "./logging/costTracker.js";
 import { saveRun } from "./approval/store.js";
+import { companyFromDomain } from "./util/companyFromDomain.js";
 
 export interface StartAuditInput {
   url: string;
   constraints?: string | null;
   docs?: { name: string; text: string }[];
   maxPages?: number;
+  /**
+   * Opt-in: questions to ask several AI models about the brand (Beacon's AI
+   * visibility check — see BEACON_ARCHITECTURE.md §3.2). Skipped entirely
+   * when empty, since it's extra LLM spend beyond the base audit.
+   */
+  aiVisibilityPrompts?: string[];
+  /** Brand name to check for in AI visibility answers. Derived from the domain if omitted. */
+  brand?: string;
 }
 
 /**
@@ -79,7 +89,23 @@ export async function runAuditPipeline(input: StartAuditInput): Promise<AuditRun
     ]);
     const eeat = await runEeatAudit(crawl, docStore, tracker.onUsage, tracker.ceilingExceeded, onWarning);
 
-    run.findings = [...technical, ...onpage, ...geoAeo, ...performance, ...eeat];
+    let aiVisibility: Awaited<ReturnType<typeof runAiVisibilityAudit>> = [];
+    if (input.aiVisibilityPrompts?.length) {
+      aiVisibility = await runAiVisibilityAudit(
+        {
+          brand: input.brand || companyFromDomain(crawl.rootUrl),
+          siteUrl: crawl.rootUrl,
+          prompts: input.aiVisibilityPrompts,
+          models: config.aiVisibilityModels,
+        },
+        docStore,
+        tracker.onUsage,
+        tracker.ceilingExceeded,
+        onWarning,
+      );
+    }
+
+    run.findings = [...technical, ...onpage, ...geoAeo, ...performance, ...eeat, ...aiVisibility];
     run.score = computeScore(run.findings);
     run.status = "synthesizing";
     await saveRun(run);

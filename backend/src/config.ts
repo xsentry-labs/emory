@@ -44,6 +44,24 @@ export const config = {
   maxCrawlConcurrency: Number(process.env.MAX_CRAWL_CONCURRENCY ?? 5),
 
   useFirecrawl: bool(process.env.USE_FIRECRAWL, true),
+
+  // AI visibility ("does an AI assistant recommend/mention this brand?").
+  // Mixing model families deliberately — this is the one place calling
+  // several different models through OpenRouter is the point, not a
+  // cost-routing decision. See BEACON_ARCHITECTURE.md §3.2.
+  aiVisibilityModels: (process.env.AI_VISIBILITY_MODELS ?? "openai/gpt-4o-mini,google/gemini-2.5-flash,anthropic/claude-haiku-4.5")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean),
+
+  // Beacon's continuous-re-audit scheduler (Phase B1 — no per-workspace
+  // model yet, see BEACON_ARCHITECTURE.md §2/§7). A fixed, comma-separated
+  // list of site URLs and a cron expression; empty by default (opt-in).
+  beaconTargetUrls: (process.env.BEACON_TARGET_URLS ?? "")
+    .split(",")
+    .map((u) => u.trim())
+    .filter(Boolean),
+  beaconReauditCron: process.env.BEACON_REAUDIT_CRON ?? "0 3 * * *",
 };
 
 export function requireOpenRouter() {
