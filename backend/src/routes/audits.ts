@@ -3,8 +3,10 @@ import { z } from "zod";
 import rateLimit from "express-rate-limit";
 import { runAuditPipeline } from "../pipeline.js";
 import { loadRun, listRuns } from "../approval/store.js";
+import { findPreviousRun } from "../approval/findPreviousRun.js";
 import { asyncHandler } from "../util/asyncHandler.js";
 import { diffFindings } from "../synth/diff.js";
+import { renderDiffMarkdown } from "../synth/diffReport.js";
 
 export const auditsRouter = Router();
 
@@ -103,7 +105,8 @@ auditsRouter.get(
  * URL — the "3 new pages missing descriptions since last week" view Beacon's
  * continuous re-audit is for (BEACON_ARCHITECTURE.md §3.1). 404s (rather
  * than an empty diff) when there's no prior run, so a caller can tell "first
- * audit of this site" apart from "nothing changed."
+ * audit of this site" apart from "nothing changed." `?format=md` returns the
+ * same comparison rendered as a Markdown change report (Phase B2).
  */
 auditsRouter.get(
   "/:id/diff",
@@ -111,23 +114,22 @@ auditsRouter.get(
     const run = await loadRun(req.params.id);
     if (!run) return res.status(404).json({ error: "run not found" });
 
-    const allRuns = await listRuns();
-    const previous = allRuns
-      .filter((r) => r.url === run.url && r.id !== run.id && r.createdAt < run.createdAt && r.status !== "failed")
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
+    const previous = await findPreviousRun(run);
     if (!previous) {
       return res.status(404).json({ error: "no prior completed run for this URL to diff against" });
     }
 
-    const previousFull = await loadRun(previous.id);
-    if (!previousFull) return res.status(404).json({ error: "prior run could not be loaded" });
+    const diff = diffFindings(previous.findings, run.findings);
+
+    if (req.query.format === "md") {
+      return res.type("text/markdown").send(renderDiffMarkdown(diff, run, previous));
+    }
 
     res.json({
       currentRunId: run.id,
-      previousRunId: previousFull.id,
-      previousRunAt: previousFull.createdAt,
-      ...diffFindings(previousFull.findings, run.findings),
+      previousRunId: previous.id,
+      previousRunAt: previous.createdAt,
+      ...diff,
     });
   }),
 );

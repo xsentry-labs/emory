@@ -73,14 +73,14 @@ npm run audit:cli -- https://example.com --docs ./brand-guidelines.txt --constra
 | `GET` | `/approvals/:runId` | List that run's suggestions and their decision state. |
 | `POST` | `/approvals/:runId/suggestions/:suggestionId` | `{ decision: "approve" \| "reject", edits?: { recommendedChange?, note? } }`. 404 if the run/suggestion doesn't exist, 409 if that suggestion was already applied. |
 | `POST` | `/audits/:runId/apply` | Implements every currently-`approved` suggestion: generates fix files, opens a GitHub PR (`{ owner?, repo?, baseBranch? }`, defaults from env), or writes a local patch dir if GitHub isn't configured. 400 if nothing is approved yet; 409 if the run is already applying/applied. |
-| `GET` | `/audits/:id/diff` | Diffs this run's findings against the most recent prior completed run for the same URL — Beacon's "what changed since last time" view. 404 if there's no prior run to diff against. |
+| `GET` | `/audits/:id/diff` | Diffs this run's findings against the most recent prior completed run for the same URL — Beacon's "what changed since last time" view. 404 if there's no prior run to diff against. Add `?format=md` for the same comparison as a human-readable Markdown report. |
 
 Every response is JSON; every 4xx/5xx is `{ "error": "..." }`. An unknown
 route returns 404 the same way rather than Express's default HTML page.
 
 ## Beacon: AI visibility + continuous re-audit
 
-Two Beacon Phase B1 features (see `../BEACON_ARCHITECTURE.md`), both built
+Beacon Phase B1 and B2 features (see `../BEACON_ARCHITECTURE.md`), all built
 entirely on the infrastructure above — no new paid dependency, no
 multi-tenancy:
 
@@ -107,8 +107,10 @@ omitted.
 
 **Continuous re-audit.** Set `BEACON_TARGET_URLS` (comma-separated) and the
 server re-audits each one on `BEACON_REAUDIT_CRON` (default: daily at 3am),
-logging a summary (`added`/`resolved`/`persisting` finding counts) each time
-via the same `GET /audits/:id/diff` logic above. A no-op — nothing starts —
+logging a summary (`added`/`resolved`/`persisting` finding counts) each time.
+Pull the full comparison anytime with `GET /audits/:id/diff` (JSON) or
+`GET /audits/:id/diff?format=md` (a "what changed" report: score delta,
+then Resolved/New/Still open sections). A no-op — nothing starts —
 if `BEACON_TARGET_URLS` is left empty, so this changes nothing for an
 Audit-only deployment. Single-instance only (see "Deploy to Railway" below).
 
@@ -215,19 +217,20 @@ Notes specific to Railway:
 ## Tests
 
 ```bash
-npm test         # vitest — 64 tests across 13 files, no API keys needed
+npm test         # vitest — 77 tests across 16 files, no API keys needed
 npm run typecheck
 ```
 
 Covers both the deterministic pieces (technical audit rules, scoring, report
-rendering, doc chunking, findings diffing) and the LLM-backed agents
-(`onpage`, `synthesizer`, `aiVisibility`, `pagespeed`'s three-tier fallback)
-with OpenRouter mocked out — so the routing/validation/warning logic is
-verified without spending real tokens. Also covers the hardening added
-alongside them (the per-run lock actually serializes, a zero-page crawl
-fails clearly, malformed LLM output is dropped) and the scheduler (starts
-only when `BEACON_TARGET_URLS` is set, validates its cron expression, one
-target's failure doesn't stop the batch). The coding agent and full
+rendering, doc chunking, findings diffing and its Markdown rendering) and
+the LLM-backed agents (`onpage`, `geoAeo`, `synthesizer`, `aiVisibility`,
+`pagespeed`'s three-tier fallback) with OpenRouter mocked out — so the
+routing/validation/warning logic is verified without spending real tokens.
+Also covers the hardening added alongside them (the per-run lock actually
+serializes, a zero-page crawl fails clearly, malformed LLM output is
+dropped) and the scheduler (starts only when `BEACON_TARGET_URLS` is set,
+validates its cron expression, one target's failure doesn't stop the
+batch). The coding agent and full
 end-to-end pipeline aren't mocked-tested; exercise those via
 `npm run audit:cli` against a real site once `OPENROUTER_API_KEY` is set.
 

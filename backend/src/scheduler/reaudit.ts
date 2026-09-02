@@ -2,7 +2,7 @@ import { schedule as cronSchedule, validate as cronValidate } from "node-cron";
 import pino from "pino";
 import { config } from "../config.js";
 import { runAuditPipeline } from "../pipeline.js";
-import { listRuns, loadRun } from "../approval/store.js";
+import { findPreviousRun } from "../approval/findPreviousRun.js";
 import { diffFindings } from "../synth/diff.js";
 
 const log = pino({ name: "beacon-scheduler" });
@@ -53,19 +53,9 @@ async function runOne(url: string): Promise<void> {
     return;
   }
 
-  const allRuns = await listRuns();
-  const previousSummary = allRuns
-    .filter((r) => r.url === run.url && r.id !== run.id && r.createdAt < run.createdAt && r.status !== "failed")
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
-
-  if (!previousSummary) {
-    log.info({ url, runId: run.id, findings: run.findings.length }, "scheduled re-audit complete (first run for this URL)");
-    return;
-  }
-
-  const previous = await loadRun(previousSummary.id);
+  const previous = await findPreviousRun(run);
   if (!previous) {
-    log.warn({ url, runId: run.id, previousRunId: previousSummary.id }, "could not load prior run to diff against");
+    log.info({ url, runId: run.id, findings: run.findings.length }, "scheduled re-audit complete (first run for this URL)");
     return;
   }
 

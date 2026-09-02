@@ -275,9 +275,23 @@ flow, matching the "no multi-tenancy needed" scope call above. See
 `backend/README.md`'s "Beacon: AI visibility + continuous re-audit" section
 for usage.
 
-**Phase B2 — round out the site-level story.**
+**Phase B2 — round out the site-level story. ✅ Implemented.**
 Diffing polish on re-audits (change-over-time reporting), shopping
 catalogue schema (§3.6). Still no multi-tenancy required.
+
+Shipped as: `backend/src/synth/diffReport.ts` (the same added/resolved/
+persisting comparison from B1, rendered as a human-readable "what changed"
+Markdown report — score delta, then each section — exposed via
+`GET /audits/:id/diff?format=md`), a shared `backend/src/approval/findPreviousRun.ts`
+(the "most recent prior completed run for this URL" lookup, previously
+duplicated between the diff route and the scheduler), and an extension to
+`audit/geoAeo.ts`'s existing schema-fit prompt: it now explicitly checks
+product/pricing-shaped pages for Product schema's Offer (price, currency,
+availability) and AggregateRating sub-properties, not just the bare
+`@type: Product` presence — a Product node with no price/availability is as
+unreadable to an AI shopping tool as no schema at all. No new module, per
+§3.6's "genuinely low-effort, high-reuse" scope call — same agent, same
+finding shape, same fix-note path through the coding agent.
 
 **Phase B3 — the multi-tenancy line.**
 `Workspace`/`Connection` model, Postgres migration (§2), Business Profile

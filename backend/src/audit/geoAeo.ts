@@ -29,8 +29,15 @@ Check for, per page:
   information only implied, buried in marketing prose, or rendered client-side?
 - Whether headings and paragraphs stand alone out of context (a good citation unit) \
   vs. requiring the whole page to make sense.
-- FAQ-shaped content and whether FAQPage/HowTo/Product schema would fit but is missing \
+- FAQ-shaped content and whether FAQPage/HowTo schema would fit but is missing \
   (only flag if the schema is genuinely absent — check the provided jsonLdTypes list).
+- Product/shopping readiness for any page that presents something for sale (a product, \
+  a paid plan, a bookable service): does it carry Product schema, and within it does the \
+  Offer sub-property state a real price and availability, and is there an AggregateRating \
+  if reviews/ratings are shown on the page? AI shopping and research tools need those \
+  specific fields, not just a bare Product type — a Product with no price/availability is \
+  as unreadable to them as no schema at all. Only flag pages that are genuinely \
+  product/pricing-shaped; a blog post or about page needs none of this.
 - Freshness signals (dated content, "last updated") for claims that go stale (pricing, \
   version numbers).
 
@@ -40,7 +47,8 @@ Rules:
 - Do not flag a page for missing schema types it doesn't need (e.g. a blog post doesn't \
   need Product schema).
 - When you recommend a schema addition, put a minimal, valid JSON-LD example in \
-  "codeGuidance".
+  "codeGuidance" — for a Product finding, include Offer (price, priceCurrency, \
+  availability) and AggregateRating (only if the page actually shows a rating/review count).
 - Reply with ONLY JSON: {"findings": LlmFinding[]}.`;
 
 export async function runGeoAeoAudit(
