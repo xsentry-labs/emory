@@ -256,12 +256,24 @@ new approval model.
 
 ## 7. Phased build plan
 
-**Phase B1 — ship value with zero new infrastructure.**
+**Phase B1 — ship value with zero new infrastructure. ✅ Implemented.**
 Continuous re-audit (§3.1) as a cron job against a fixed config list (no
 workspace/connection model yet — reuse Audit's one-shot model, just
 scheduled), plus AI visibility tracking (§3.2). Both are pure extensions of
-`backend/` as it exists today. This is the natural "next PR" after this
-architecture doc.
+`backend/` as it exists today.
+
+Shipped as: `backend/src/audit/aiVisibility.ts` (deterministic brand-mention
+check + an LLM accuracy pass against company docs, only when the brand is
+mentioned somewhere), `backend/src/synth/diff.ts` (added/resolved/persisting
+findings between two runs for the same URL, matched coarsely by
+agent+category+URL rather than by title text, which an LLM rephrases run to
+run), `backend/src/scheduler/reaudit.ts` (an in-process `node-cron` job over
+`BEACON_TARGET_URLS`, a no-op when that's unset), and a new
+`GET /audits/:id/diff` route. `aiVisibilityPrompts`/`brand` are opt-in
+fields on `POST /audits` — this is not yet wired to a workspace/onboarding
+flow, matching the "no multi-tenancy needed" scope call above. See
+`backend/README.md`'s "Beacon: AI visibility + continuous re-audit" section
+for usage.
 
 **Phase B2 — round out the site-level story.**
 Diffing polish on re-audits (change-over-time reporting), shopping

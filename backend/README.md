@@ -73,9 +73,44 @@ npm run audit:cli -- https://example.com --docs ./brand-guidelines.txt --constra
 | `GET` | `/approvals/:runId` | List that run's suggestions and their decision state. |
 | `POST` | `/approvals/:runId/suggestions/:suggestionId` | `{ decision: "approve" \| "reject", edits?: { recommendedChange?, note? } }`. 404 if the run/suggestion doesn't exist, 409 if that suggestion was already applied. |
 | `POST` | `/audits/:runId/apply` | Implements every currently-`approved` suggestion: generates fix files, opens a GitHub PR (`{ owner?, repo?, baseBranch? }`, defaults from env), or writes a local patch dir if GitHub isn't configured. 400 if nothing is approved yet; 409 if the run is already applying/applied. |
+| `GET` | `/audits/:id/diff` | Diffs this run's findings against the most recent prior completed run for the same URL — Beacon's "what changed since last time" view. 404 if there's no prior run to diff against. |
 
 Every response is JSON; every 4xx/5xx is `{ "error": "..." }`. An unknown
 route returns 404 the same way rather than Express's default HTML page.
+
+## Beacon: AI visibility + continuous re-audit
+
+Two Beacon Phase B1 features (see `../BEACON_ARCHITECTURE.md`), both built
+entirely on the infrastructure above — no new paid dependency, no
+multi-tenancy:
+
+**AI visibility.** Pass `aiVisibilityPrompts` (and optionally `brand`) on
+`POST /audits` to also check whether AI models mention the brand when asked
+buying questions — the same check the product's own copy describes ("we
+asked ChatGPT, Claude, Perplexity... forty times"), made real:
+
+```bash
+curl -X POST localhost:8787/audits -H "content-type: application/json" -d '{
+  "url": "https://example.com",
+  "brand": "Acme",
+  "aiVisibilityPrompts": ["best tool for weekly marketing reports", "Acme vs Cadence"]
+}'
+```
+
+Each prompt is asked to every model in `AI_VISIBILITY_MODELS` (mixing model
+families deliberately). A prompt no model mentions the brand for becomes a
+`critical` finding; some-but-not-all becomes `warning` — each with the
+model's actual answer as evidence. If company docs were also uploaded, a
+brand mention that contradicts them (wrong price, wrong feature) is flagged
+separately. Skipped entirely (zero extra cost) when `aiVisibilityPrompts` is
+omitted.
+
+**Continuous re-audit.** Set `BEACON_TARGET_URLS` (comma-separated) and the
+server re-audits each one on `BEACON_REAUDIT_CRON` (default: daily at 3am),
+logging a summary (`added`/`resolved`/`persisting` finding counts) each time
+via the same `GET /audits/:id/diff` logic above. A no-op — nothing starts —
+if `BEACON_TARGET_URLS` is left empty, so this changes nothing for an
+Audit-only deployment. Single-instance only (see "Deploy to Railway" below).
 
 ## Company documents (RAG)
 
@@ -168,10 +203,11 @@ Notes specific to Railway:
   JSON-file store for Postgres before relying on this in production (see
   "Persistence" in `../ARCHITECTURE.md`) — either is a change to
   `src/approval/store.ts` alone.
-- This is a single-instance MVP: the run lock and the local-Lighthouse
-  browser pool are both in-process state, so don't scale this service to
-  multiple Railway replicas without moving the run store to a real database
-  first (a second instance wouldn't see the first's lock or in-flight runs).
+- This is a single-instance MVP: the run lock, the local-Lighthouse browser
+  pool, and the Beacon re-audit scheduler are all in-process state, so don't
+  scale this service to multiple Railway replicas without moving the run
+  store to a real database first (a second instance wouldn't see the
+  first's lock or in-flight runs, and would double up scheduled re-audits).
 - Set `CORS_ORIGIN` (comma-separated origins) once you know your frontend's
   deployed URL, to stop accepting requests from arbitrary origins — it's
   wide open by default, which is fine for local development only.
@@ -179,19 +215,21 @@ Notes specific to Railway:
 ## Tests
 
 ```bash
-npm test         # vitest — 44 tests across 10 files, no API keys needed
+npm test         # vitest — 64 tests across 13 files, no API keys needed
 npm run typecheck
 ```
 
 Covers both the deterministic pieces (technical audit rules, scoring, report
-rendering, doc chunking) and the LLM-backed agents (`onpage`, `synthesizer`,
-`pagespeed`'s three-tier fallback) with OpenRouter mocked out — so the
-routing/validation/warning logic is verified without spending real tokens.
-Also covers the hardening added alongside them: the per-run lock actually
-serializes, a zero-page crawl fails clearly, malformed LLM output is
-dropped. The coding agent and full end-to-end pipeline aren't mocked-tested;
-exercise those via `npm run audit:cli` against a real site once
-`OPENROUTER_API_KEY` is set.
+rendering, doc chunking, findings diffing) and the LLM-backed agents
+(`onpage`, `synthesizer`, `aiVisibility`, `pagespeed`'s three-tier fallback)
+with OpenRouter mocked out — so the routing/validation/warning logic is
+verified without spending real tokens. Also covers the hardening added
+alongside them (the per-run lock actually serializes, a zero-page crawl
+fails clearly, malformed LLM output is dropped) and the scheduler (starts
+only when `BEACON_TARGET_URLS` is set, validates its cron expression, one
+target's failure doesn't stop the batch). The coding agent and full
+end-to-end pipeline aren't mocked-tested; exercise those via
+`npm run audit:cli` against a real site once `OPENROUTER_API_KEY` is set.
 
 ## Wiring to the frontend
 

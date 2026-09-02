@@ -5,6 +5,11 @@ GEO/AEO audit system with a human approval gate and a coding agent that opens
 GitHub PRs for approved changes. It is deployed separately from the existing
 Next.js frontend in this repo (frontend → Vercel, backend → Railway).
 
+This is the Audit agent specifically. `BEACON_ARCHITECTURE.md` scopes the
+next agent (continuous re-audit + AI visibility, business profile, reviews),
+Phase B1 of which now lives alongside Audit in `backend/` — the agent table
+below (§2) includes it.
+
 ## 0. Why a separate backend
 
 The rest of this repository (`app/`, `components/`, `lib/`) is a static,
@@ -108,6 +113,7 @@ is more useful than a killed one).
 | On-Page & Content | `audit/onpage.ts` | mid | Titles/metas/headings quality, keyword alignment, content depth vs. thin content |
 | GEO/AEO | `audit/geoAeo.ts` | mid | llms.txt, answer-shaped content, citation-friendliness, AI-oriented schema |
 | Brand/Company RAG | `rag/docStore.ts` + `audit/eeat.ts` | embed + mid | Ingests uploaded docs, grounds E-E-A-T and brand-voice findings in them |
+| AI Visibility *(Beacon B1)* | `audit/aiVisibility.ts` | mid | Opt-in: does the brand get mentioned when several distinct model families are asked buying questions (deterministic substring check, not judgment), and where it is mentioned, is what's said accurate against the company's own docs — see `BEACON_ARCHITECTURE.md` §3.2 |
 | Synthesizer | `synth/synthesizer.ts` | strong | Merges all findings, dedupes, scores severity × effort → P0–P3, writes the Markdown report |
 | Coding Agent | `coding/agent.ts` | strong (only for generated snippets; file edits are deterministic where possible) | Applies **approved** items only: meta/title fixes, JSON-LD generation, robots/sitemap patches; opens a GitHub PR via Octokit, or writes a local patch if no repo is configured |
 

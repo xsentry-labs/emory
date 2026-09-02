@@ -7,6 +7,7 @@ import { config } from "./config.js";
 import { auditsRouter } from "./routes/audits.js";
 import { approvalsRouter } from "./routes/approvals.js";
 import { applyRouter } from "./routes/apply.js";
+import { startReauditScheduler } from "./scheduler/reaudit.js";
 
 const app = express();
 
@@ -57,3 +58,6 @@ app.listen(config.port, () => {
   // eslint-disable-next-line no-console
   console.log(`emory-audit-backend listening on :${config.port}`);
 });
+
+// No-op unless BEACON_TARGET_URLS is set — see backend/src/scheduler/reaudit.ts.
+startReauditScheduler();
