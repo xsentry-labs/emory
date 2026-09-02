@@ -11,6 +11,13 @@ Messaging Bible v1.0*. **Mock data only**: no backend, no auth, no external
 calls. Every interaction is real and stateful, and state survives navigation and
 a page reload (localStorage).
 
+A real backend for the Audit agent — an actual multi-agent SEO/GEO/AEO crawl
+and audit pipeline, a human approval gate, and a coding agent that opens
+GitHub PRs for approved fixes, all via OpenRouter — lives in [`backend/`](backend/README.md)
+and deploys separately (Railway). See [`ARCHITECTURE.md`](ARCHITECTURE.md) for
+how it's designed and why. It is not yet wired into the screens below, which
+still render `lib/mock-data.ts`.
+
 ## Run it
 
 ```bash
