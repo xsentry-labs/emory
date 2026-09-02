@@ -104,7 +104,7 @@ is more useful than a killed one).
 |---|---|---|---|
 | Data Collector | `crawl/*` | none (deterministic) | Crawl, robots.txt, sitemap.xml, per-page raw extraction |
 | Technical SEO | `audit/technical.ts` | none (rule-based) | Indexation, canonicals, redirects, status codes, structured data validity, security headers, mobile viewport — deterministic checks, zero LLM cost since they don't need judgment |
-| Performance | `audit/pagespeed.ts` | none (API) | Core Web Vitals via PageSpeed Insights, degrades to a heuristic estimate without a key |
+| Performance | `audit/pagespeed.ts` + `audit/localLighthouse.ts` | none (API or local browser) | Core Web Vitals via PageSpeed Insights (paid) if configured, else a **real local Lighthouse run** on Puppeteer's bundled open-source Chromium (`browser/pool.ts`) — only degrades to a page-weight heuristic if a headless browser can't launch at all |
 | On-Page & Content | `audit/onpage.ts` | mid | Titles/metas/headings quality, keyword alignment, content depth vs. thin content |
 | GEO/AEO | `audit/geoAeo.ts` | mid | llms.txt, answer-shaped content, citation-friendliness, AI-oriented schema |
 | Brand/Company RAG | `rag/docStore.ts` + `audit/eeat.ts` | embed + mid | Ingests uploaded docs, grounds E-E-A-T and brand-voice findings in them |
@@ -167,33 +167,105 @@ is a single small module with `get/save/list`, so swapping in Postgres later
 
 ## 5. Output artifacts
 
-Every run produces both `report.json` (typed, consumed by the approval UI)
-and `report.md` (human-readable, same content) under
-`DATA_DIR/runs/<runId>/`. Suggestion IDs are stable across both so an
-approval decision made against the JSON maps directly onto the Markdown
-section.
+Every run is one JSON file, `DATA_DIR/runs/<runId>.json` (the full `AuditRun`
+record — findings, suggestions, cost, warnings), with the Markdown report
+generated from it and stored inline as `reportMarkdown` rather than as a
+second file; `GET /audits/:id/report.md` serves that field with a Markdown
+content type. Suggestion IDs are stable across both representations, so a
+decision recorded against the JSON is reflected in the Markdown on next
+render (`renderMarkdown` is re-run and re-saved on every approval decision).
 
-## 6. Cost controls
+## 6. Paid vs. open-source, by design
+
+OpenRouter is the only mandatory paid dependency — it's the sole LLM/embedding
+provider, deliberately, and it's usage-billed. Every other external service is
+optional and has a real open-source fallback wired in automatically, not just
+a degraded stub:
+
+| Capability | Paid option | Default / fallback |
+|---|---|---|
+| Crawling | Firecrawl (`FIRECRAWL_API_KEY`) | `fetch` + cheerio (`crawl/fallbackCrawler.ts`) |
+| Core Web Vitals | Google PageSpeed Insights (`PAGESPEED_API_KEY`) | **Real local Lighthouse** on Puppeteer's bundled Chromium (`audit/localLighthouse.ts`, `browser/pool.ts`) — actual Lighthouse scoring, self-hosted, not a heuristic. A page-weight heuristic is the *third* tier, used only if a headless browser can't launch at all. |
+| PR delivery | GitHub API (free, just needs `GITHUB_TOKEN`) | Local patch directory under `DATA_DIR/patches/<runId>/` |
+
+`.env.example` labels each of these `[PAID]` explicitly. Model tiering
+(cheap/mid/strong, `llm/openrouter.ts`) is the cost control *within* the one
+mandatory paid dependency, covered in §7.
+
+## 7. Reliability and edge-case handling
+
+A handful of failure modes matter enough to call out as deliberate design,
+not gaps discovered later:
+
+- **A non-fatal LLM failure never fails the whole run.** Every audit agent
+  and the synthesizer catch their own model-call errors, record a
+  deduplicated message in the run's `warnings` array, and continue with
+  whatever they did get — a missing `OPENROUTER_API_KEY` degrades an audit
+  to its rule-based findings plus clear warnings, rather than a 500. The
+  Markdown report surfaces the same warnings as a "this run is incomplete"
+  callout.
+- **A site that can't be fetched at all fails loudly and specifically**
+  (`crawl/collect.ts` throws if zero pages come back from either crawler,
+  including the case where Firecrawl's call succeeds but returns nothing)
+  instead of quietly producing a hollow "successful" audit.
+- **LLM JSON output is checked for the fields it actually needs**
+  (`util/validateLlm.ts`) before becoming a finding/suggestion — a model
+  that emits valid JSON with an empty or missing field gets that entry
+  dropped, not rendered as `"undefined"`.
+- **No route can hang or crash the process.** `util/asyncHandler.ts` wraps
+  every Express handler so a rejected promise reaches a single error
+  middleware instead of an unhandled rejection (which, on Node 15+, kills
+  the process by default).
+- **Concurrent writes to the same run are serialized**, not raced —
+  `approval/runLock.ts` is an in-process per-run mutex around the JSON
+  store's read-modify-write, and `/apply` additionally refuses a second
+  call while a run is `applying` or already `applied` (409). This is a
+  single-instance-appropriate fix; a multi-instance deploy needs the
+  database-backed store noted in §4, with real row locking.
+- **The single most expensive endpoint (`POST /audits`) is rate-limited**
+  (`RATE_LIMIT_AUDITS_PER_HOUR`, default 20/hour/client) — a cost control
+  that sits above the per-run `COST_CEILING_USD`, which only bounds one
+  run's spend, not how many runs a client can start.
+
+## 8. Cost controls
 
 - Cheap tier for anything that runs once per page (technical checks can be
-  O(hundreds) of pages).
+  O(hundreds) of pages) — currently rule-based (§2) rather than an actual
+  cheap-tier call, since these checks don't need judgment; the tier exists
+  for when a future check does.
 - Mid tier for anything that runs once per page *and* needs judgment
-  (on-page, GEO/AEO) — batched into single calls per page rather than one
-  call per check.
-- Strong tier called exactly twice per run: once for synthesis, once for
-  code/PR generation on the approved subset.
+  (on-page, GEO/AEO, E-E-A-T) — batched into single calls per page/batch
+  rather than one call per check.
+- Strong tier used for synthesis (once or twice per run, depending on
+  whether chunk consolidation is needed) and for the coding agent's fix
+  notes (once per *approved* suggestion, capped by `COST_CEILING_USD` — once
+  hit, remaining notes are built straight from the suggestion's own text
+  instead of another call).
 - Page sampling: crawls beyond `MAX_PAGES` (config, default 60) are capped
-  and the excess is noted in the report rather than silently dropped.
+  and the excess is noted in the report rather than silently dropped;
+  company-doc ingestion is similarly capped (§ Company documents in
+  `backend/README.md`) so an oversized upload can't blow up embedding cost.
+- `RATE_LIMIT_AUDITS_PER_HOUR` bounds how many audits (the expensive
+  endpoint) a client can start per hour — a ceiling above the per-run one.
 - `costTracker` gives per-run token/cost totals in the API response and the
   Markdown report footer.
 
-## 7. What's deliberately out of scope for this pass
+## 9. What's deliberately out of scope for this pass
 
-- Live SERP/competitor analysis (needs a paid SERP API; stubbed as an
-  optional agent behind `SERPAPI_KEY` for a later phase).
+- Live SERP/competitor analysis. Evaluated Serper.dev (~$0.001–0.003/query),
+  SerpApi (~$0.01–0.015/query, most established), and DataForSEO
+  (comparable to Serper, more setup) — Serper.dev would be the pick given
+  the cost-consciousness bar, gated behind an optional key the same way
+  Firecrawl/PSI are, and simply skipped (not faked) if unset. Not wired in
+  yet.
 - Vector DB beyond an in-memory store for company docs (fine at MVP doc
-  volumes; swap for LanceDB/Chroma if doc corpora grow).
-- Wiring the existing `/audit` and `/approvals` Next.js screens to this API
-  (they still render `lib/mock-data.ts`) — left as a follow-up so this change
-  stays reviewable as "the backend exists and works," not "the frontend was
-  rewritten too."
+  volumes, now with an explicit size cap; swap for LanceDB/Chroma if doc
+  corpora grow past a few hundred chunks).
+- Wiring the remaining Next.js screens (`/approvals`, `/brain`,
+  `/customers`, `/revenue`, `/connections`) to this API — `/audit` itself is
+  wired (see `lib/audit-api.ts` and `components/audit/audit-view.tsx` in the
+  repo root), but the others cover product surface (CRM, ad spend, reviews,
+  attribution) this backend doesn't implement.
+- Horizontal scaling: the run lock (§7) and the local-Lighthouse browser
+  pool are both in-process state, so this is a single-instance service until
+  the run store moves to a real database.

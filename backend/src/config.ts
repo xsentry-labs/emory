@@ -22,8 +22,19 @@ export const config = {
 
   costCeilingUsd: Number(process.env.COST_CEILING_USD ?? 2.0),
 
+  // PAID, optional. Without a key, crawling falls back to the built-in
+  // open-source fetch+cheerio (and, for hydration-heavy pages, Puppeteer) crawler.
   firecrawlApiKey: process.env.FIRECRAWL_API_KEY ?? "",
+  // PAID (Google Cloud), optional. Without a key, performance auditing falls
+  // back to a real local Lighthouse run on bundled open-source Chromium.
   pagespeedApiKey: process.env.PAGESPEED_API_KEY ?? "",
+  // Optional override for the Chromium binary Puppeteer/Lighthouse launch
+  // (e.g. a system Chromium installed via the Railway/nixpacks build). Left
+  // unset, Puppeteer uses the Chromium it downloads itself at npm install time.
+  chromiumExecutablePath: process.env.CHROMIUM_EXECUTABLE_PATH ?? "",
+  // Set to skip real local Lighthouse entirely (e.g. a deploy target with no
+  // headless-browser support at all) and go straight to the page-weight heuristic.
+  disableLocalLighthouse: bool(process.env.DISABLE_LOCAL_LIGHTHOUSE, false),
 
   githubToken: process.env.GITHUB_TOKEN ?? "",
   githubDefaultOwner: process.env.GITHUB_DEFAULT_OWNER ?? "",

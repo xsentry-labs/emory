@@ -42,7 +42,13 @@ export async function generateFixFiles(run: AuditRun): Promise<GeneratedFile[]> 
   const files: GeneratedFile[] = [];
 
   for (const suggestion of approved) {
-    const body = await generateNote(suggestion, run.url, tracker.onUsage);
+    // Once the run's cost ceiling is hit — or if OpenRouter simply isn't
+    // configured — fall back to a deterministic note built straight from
+    // the suggestion's own (already human-approved) fields instead of
+    // failing the whole apply over one LLM call.
+    const body = tracker.ceilingExceeded()
+      ? plainTextNote(suggestion)
+      : await generateNote(suggestion, run.url, tracker.onUsage).catch(() => plainTextNote(suggestion));
     files.push({
       path: `seo-fixes/${run.id}/${suggestion.priority.toLowerCase()}-${slugify(suggestion.title)}.md`,
       content: `# ${suggestion.title}\n\n${body}\n`,
@@ -89,6 +95,25 @@ Reviewer note: ${suggestion.edits?.note ?? "(none)"}`;
     maxTokens: 500,
     onUsage,
   });
+}
+
+/** Deterministic fallback when the LLM note-writer can't run — no OpenRouter key, or the run's cost ceiling was hit. */
+function plainTextNote(suggestion: Suggestion): string {
+  const lines = [
+    `**Why:** ${suggestion.why}`,
+    "",
+    "**Evidence:**",
+    ...suggestion.evidence.slice(0, 8).map((e) => `- ${e.url} — \`${e.currentValue}\``),
+    "",
+    `**Recommended change:** ${suggestion.edits?.recommendedChange ?? suggestion.recommendedChange}`,
+  ];
+  if (suggestion.codeGuidance) {
+    lines.push("", "```", suggestion.codeGuidance, "```");
+  }
+  if (suggestion.edits?.note) {
+    lines.push("", `**Reviewer note:** ${suggestion.edits.note}`);
+  }
+  return lines.join("\n");
 }
 
 function buildLlmsTxt(siteUrl: string): string {

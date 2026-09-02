@@ -63,6 +63,7 @@ describe("renderMarkdown", () => {
       ],
       modelCalls: [],
       costUsd: 0.01,
+      warnings: [],
       score: 80,
     };
 

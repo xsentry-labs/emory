@@ -103,6 +103,8 @@ export interface AuditRun {
   reportMarkdown?: string;
   modelCalls: ModelCallLog[];
   costUsd: number;
+  /** Non-fatal problems (a batch call failed, OPENROUTER_API_KEY missing, etc.) that make the results incomplete without failing the whole run. */
+  warnings: string[];
   error?: string;
   prUrl?: string;
   patchDir?: string;

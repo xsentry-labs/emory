@@ -1,0 +1,28 @@
+# Railway build config (Nixpacks). Only needed for the local-Lighthouse
+# performance fallback: Puppeteer downloads its own pinned Chromium at
+# `npm install` time (see package.json), but that binary still needs these
+# shared libraries present on the host to actually launch headless. Without
+# them, local Lighthouse just fails its launch and the performance audit
+# degrades further to the page-weight heuristic (see backend/README.md) —
+# nothing else in this service depends on this file.
+[phases.setup]
+aptPkgs = [
+  "libnss3",
+  "libatk1.0-0",
+  "libatk-bridge2.0-0",
+  "libcups2",
+  "libdrm2",
+  "libxkbcommon0",
+  "libxcomposite1",
+  "libxdamage1",
+  "libxfixes3",
+  "libxrandr2",
+  "libgbm1",
+  "libasound2",
+  "libpango-1.0-0",
+  "libcairo2",
+  "libatspi2.0-0",
+]
+
+# Build/start commands are defined in railway.json, not here, so there's
+# exactly one place that governs them.

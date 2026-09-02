@@ -16,11 +16,25 @@ export async function collect(rootUrlInput: string, maxPages = config.maxPages):
       const { firecrawlCrawl } = await import("./firecrawl.js");
       pages = await firecrawlCrawl(rootUrl, maxPages);
       crawler = "firecrawl";
+      if (pages.length === 0) {
+        // Firecrawl returned successfully but mapped/scraped nothing (bad
+        // key with a silently-empty response, or a site it can't reach) —
+        // don't report a paid crawler that came back with nothing; retry
+        // with the open-source fallback before giving up.
+        pages = await fallbackCrawl(rootUrl, maxPages);
+        crawler = "fallback";
+      }
     } catch {
       pages = await fallbackCrawl(rootUrl, maxPages);
     }
   } else {
     pages = await fallbackCrawl(rootUrl, maxPages);
+  }
+
+  if (pages.length === 0) {
+    throw new Error(
+      `Could not fetch any pages from ${rootUrl}. It may be unreachable, blocking automated requests entirely, or the URL may be wrong.`,
+    );
   }
 
   return {

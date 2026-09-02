@@ -27,6 +27,12 @@ export function renderMarkdown(run: AuditRun): string {
   }
   lines.push("");
 
+  if (run.warnings.length) {
+    lines.push("> **This run is incomplete.** Some agents could not finish, so results below may be partial:");
+    for (const w of run.warnings) lines.push(`> - ${w}`);
+    lines.push("");
+  }
+
   const byPriority = new Map<Priority, Suggestion[]>();
   for (const s of run.suggestions) {
     const list = byPriority.get(s.priority) ?? [];

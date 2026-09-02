@@ -1,6 +1,7 @@
 import type { AuditFinding, CrawlResult, CrawledPage, ModelCallLog } from "../types.js";
 import { completeJson } from "../llm/openrouter.js";
 import { newId } from "../util/id.js";
+import { hasNonEmptyStrings } from "../util/validateLlm.js";
 
 const BATCH_SIZE = 5;
 const MAX_PAGES_SAMPLED = 20;
@@ -35,6 +36,7 @@ export async function runOnPageAudit(
   constraints: string | null,
   onUsage: (log: ModelCallLog) => void,
   ceilingExceeded: () => boolean,
+  onWarning: (msg: string) => void,
 ): Promise<AuditFinding[]> {
   const sample = crawl.pages.filter((p) => p.statusCode < 400).slice(0, MAX_PAGES_SAMPLED);
   const findings: AuditFinding[] = [];
@@ -55,6 +57,7 @@ export async function runOnPageAudit(
       });
       for (const f of parsed.findings ?? []) {
         if (!f.url || !sample.some((p) => p.url === f.url)) continue;
+        if (!hasNonEmptyStrings(f, ["title", "detail", "currentValue", "recommendedChange", "expectedImpact"])) continue;
         findings.push({
           id: newId("f"),
           agent: "onpage",
@@ -68,8 +71,9 @@ export async function runOnPageAudit(
           category: "on-page",
         });
       }
-    } catch {
-      // one batch failing shouldn't drop the whole audit; skip and continue
+    } catch (err) {
+      // one batch failing shouldn't drop the whole audit; record it and move on
+      onWarning(`on-page audit: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
   }

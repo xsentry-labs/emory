@@ -2,6 +2,7 @@ import type { AuditFinding, CrawlResult, ModelCallLog } from "../types.js";
 import type { DocStore } from "../rag/docStore.js";
 import { completeJson } from "../llm/openrouter.js";
 import { newId } from "../util/id.js";
+import { hasNonEmptyStrings } from "../util/validateLlm.js";
 
 const MAX_PAGES_SAMPLED = 8;
 
@@ -41,6 +42,7 @@ export async function runEeatAudit(
   docStore: DocStore | null,
   onUsage: (log: ModelCallLog) => void,
   ceilingExceeded: () => boolean,
+  onWarning: (msg: string) => void,
 ): Promise<AuditFinding[]> {
   const sample = crawl.pages.filter((p) => p.statusCode < 400 && p.wordCount > 80).slice(0, MAX_PAGES_SAMPLED);
   const findings: AuditFinding[] = [];
@@ -50,9 +52,16 @@ export async function runEeatAudit(
 
     let docContext = "No company documents were provided.";
     if (docStore) {
-      const matches = await docStore.search(`${page.title ?? ""} ${page.textSample.slice(0, 500)}`, 4);
-      if (matches.length) {
-        docContext = matches.map((m) => `[${m.docName}] ${m.text}`).join("\n---\n");
+      try {
+        const matches = await docStore.search(`${page.title ?? ""} ${page.textSample.slice(0, 500)}`, 4);
+        if (matches.length) {
+          docContext = matches.map((m) => `[${m.docName}] ${m.text}`).join("\n---\n");
+        }
+      } catch (err) {
+        // Deliberately no page URL in this message: the same root cause fails
+        // identically for every page, and the pipeline dedupes warnings by
+        // exact text — a per-page URL would defeat that and flood the report.
+        onWarning(`E-E-A-T audit: could not search company docs: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
@@ -73,6 +82,7 @@ ${docContext}`;
         onUsage,
       });
       for (const f of parsed.findings ?? []) {
+        if (!hasNonEmptyStrings(f, ["title", "detail", "currentValue", "recommendedChange", "expectedImpact"])) continue;
         findings.push({
           id: newId("f"),
           agent: "eeat",
@@ -86,7 +96,8 @@ ${docContext}`;
           category: "eeat",
         });
       }
-    } catch {
+    } catch (err) {
+      onWarning(`E-E-A-T audit: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
   }

@@ -1,6 +1,7 @@
 import type { AuditFinding, ModelCallLog, Priority, Suggestion } from "../types.js";
 import { completeJson } from "../llm/openrouter.js";
 import { newId } from "../util/id.js";
+import { hasNonEmptyStrings } from "../util/validateLlm.js";
 
 const FINDINGS_PER_CHUNK = 25;
 
@@ -44,6 +45,7 @@ export async function synthesize(
   findings: AuditFinding[],
   constraints: string | null,
   onUsage: (log: ModelCallLog) => void,
+  onWarning: (msg: string) => void,
 ): Promise<Suggestion[]> {
   if (!findings.length) return [];
 
@@ -63,18 +65,21 @@ export async function synthesize(
         onUsage,
       });
       rawSuggestions.push(...(parsed.suggestions ?? []));
-    } catch {
+    } catch (err) {
+      onWarning(`synthesizer: ${err instanceof Error ? err.message : String(err)}`);
       continue;
     }
   }
 
   let finalList = rawSuggestions;
   if (chunks.length > 1 && rawSuggestions.length > 1) {
-    finalList = await consolidate(rawSuggestions, constraints, onUsage);
+    finalList = await consolidate(rawSuggestions, constraints, onUsage, onWarning);
   }
 
+  const validPriorities: Priority[] = ["P0", "P1", "P2", "P3"];
   const suggestions: Suggestion[] = [];
   for (const s of finalList) {
+    if (!hasNonEmptyStrings(s, ["title", "why", "recommendedChange", "expectedImpact"])) continue;
     const evidence = (s.findingIds ?? [])
       .map((id) => byId.get(id))
       .filter((f): f is AuditFinding => Boolean(f))
@@ -84,7 +89,7 @@ export async function synthesize(
     suggestions.push({
       id: newId("s"),
       findingIds: s.findingIds ?? [],
-      priority: s.priority ?? "P3",
+      priority: validPriorities.includes(s.priority) ? s.priority : "P3",
       title: s.title,
       why: s.why,
       evidence,
@@ -106,6 +111,7 @@ async function consolidate(
   suggestions: LlmSuggestion[],
   constraints: string | null,
   onUsage: (log: ModelCallLog) => void,
+  onWarning: (msg: string) => void,
 ): Promise<LlmSuggestion[]> {
   const user = `${constraints ? `Focus constraint from the user: ${constraints}\n\n` : ""}Here are suggestions gathered from multiple batches of findings. Merge any that \
 are genuinely duplicates (same fix, same or overlapping URLs), re-rank priorities \
@@ -122,7 +128,8 @@ falsifiable. Return the same JSON shape.\n\n${JSON.stringify(suggestions, null, 
       onUsage,
     });
     return parsed.suggestions?.length ? parsed.suggestions : suggestions;
-  } catch {
+  } catch (err) {
+    onWarning(`synthesizer consolidation: ${err instanceof Error ? err.message : String(err)}`);
     return suggestions;
   }
 }
