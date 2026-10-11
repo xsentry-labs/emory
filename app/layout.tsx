@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import { Nav } from "@/components/nav";
+import { currentUser } from "@/lib/request-db";
 import "./globals.css";
 
 const display = Newsreader({
@@ -32,7 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body className="min-h-screen bg-paper">
-        <Nav />
+        {currentUser() ? <Nav /> : null}
         <main className="mx-auto max-w-shell px-4 pb-16 pt-8 md:px-8">{children}</main>
       </body>
     </html>

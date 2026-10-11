@@ -1,29 +1,40 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, sessionSecret, verifySession } from "./lib/session-token";
 
-// One shared admin password for the whole app (HTTP Basic Auth, any username).
-// /api/health stays open for Railway's health check.
-export function middleware(req: NextRequest) {
-  const password = process.env.ADMIN_PASSWORD;
-  if (!password) {
-    if (process.env.NODE_ENV === "production") {
-      return new NextResponse("ADMIN_PASSWORD is not set", { status: 503 });
-    }
-    return NextResponse.next();
+// Headers carrying the verified identity into pages and actions. They are
+// always overwritten here, so a client can never supply its own.
+const WORKSPACE_HEADER = "x-emory-workspace";
+const USER_HEADER = "x-emory-user";
+
+const PUBLIC_PAGES = new Set(["/login", "/signup"]);
+
+export async function middleware(req: NextRequest) {
+  const secret = sessionSecret();
+  if (!secret) {
+    return new NextResponse("Set SESSION_SECRET (or ADMIN_PASSWORD) to start the app.", { status: 503 });
   }
-  const header = req.headers.get("authorization") ?? "";
-  if (header.startsWith("Basic ")) {
-    try {
-      const decoded = atob(header.slice(6));
-      const supplied = decoded.slice(decoded.indexOf(":") + 1);
-      if (supplied === password) return NextResponse.next();
-    } catch {
-      /* fall through to 401 */
-    }
+
+  const { pathname } = req.nextUrl;
+  const claims = await verifySession(secret, req.cookies.get(SESSION_COOKIE)?.value);
+
+  const headers = new Headers(req.headers);
+  headers.delete(WORKSPACE_HEADER);
+  headers.delete(USER_HEADER);
+
+  if (PUBLIC_PAGES.has(pathname)) {
+    // Already signed in: go to the app instead of showing the form again.
+    if (claims) return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.next({ request: { headers } });
   }
-  return new NextResponse("Authentication required", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Emory", charset="UTF-8"' },
-  });
+
+  if (!claims) {
+    if (pathname.startsWith("/api/")) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  headers.set(WORKSPACE_HEADER, String(claims.workspaceId));
+  headers.set(USER_HEADER, String(claims.userId));
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = { matcher: ["/((?!api/health|_next/static|_next/image|icon.svg).*)"] };

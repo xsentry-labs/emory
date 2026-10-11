@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { isLlmConfigured } from "@/lib/llm";
 import { sendConfig } from "@/lib/mailer";
 import { getProspect, listMessages } from "@/lib/repo";

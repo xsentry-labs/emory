@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import {
   createDraft,
   createProspect,
@@ -17,8 +17,9 @@ import { PROSPECT_STATUSES } from "@/lib/types";
 import { draftMessage } from "@/lib/draft";
 import { researchLead } from "@/lib/research";
 import { readUploads, countWords, MAX_DESCRIPTION_WORDS } from "@/lib/documents";
+import { consume } from "@/lib/usage";
 import { runOnboarding } from "@/lib/onboarding";
-import { startPipeline } from "@/lib/pipeline";
+import { getPipeline, startPipeline } from "@/lib/pipeline";
 import { sourceLeads } from "@/lib/sourcing";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 
@@ -105,6 +106,7 @@ export async function generateDraft(formData: FormData) {
   let error = "";
   try {
     if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    consume(getDb(), "ai");
     await draftMessage(getDb(), openRouterLlm, input.prospectId, input.kind);
   } catch (err) {
     error = err instanceof Error ? err.message : "Drafting failed.";
@@ -119,6 +121,7 @@ export async function research(formData: FormData) {
   let error = "";
   try {
     if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    consume(getDb(), "ai");
     await researchLead(getDb(), openRouterLlm, input.prospectId);
   } catch (err) {
     error = err instanceof Error ? err.message : "Research failed.";
@@ -134,6 +137,7 @@ export async function findLeads(formData: FormData) {
   let target = "";
   try {
     if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    consume(getDb(), "hunt");
     const r = await sourceLeads(getDb(), openRouterSearch, input);
     const skipped = r.skipped.duplicate + r.skipped.unverified;
     target = `/prospects?found=${r.added}&skipped=${skipped}`;
@@ -162,7 +166,9 @@ export async function submitBusiness(formData: FormData) {
     }
     const files = formData.getAll("docs").filter((f): f is File => f instanceof File);
     const docs = await readUploads(files);
+    consume(getDb(), "onboarding");
     await runOnboarding(getDb(), openRouterLlm, { website, description, docs });
+    consume(getDb(), "hunt");
     startPipeline(getDb(), { search: openRouterSearch, llm: openRouterLlm }, { count: 10 });
   } catch (err) {
     error = err instanceof Error ? err.message : "Something went wrong.";
@@ -174,12 +180,20 @@ export async function submitBusiness(formData: FormData) {
 }
 
 /** Run the finder + research + drafting pipeline again for more leads. */
+const getPipelineRunning = () => getPipeline(getDb()).status === "running";
+
 export async function findMoreLeads(formData: FormData) {
   const focus = z.string().trim().max(300).parse(String(formData.get("focus") ?? ""));
-  if (isLlmConfigured()) {
-    startPipeline(getDb(), { search: openRouterSearch, llm: openRouterLlm }, { count: 10, focus });
+  let error = "";
+  try {
+    if (isLlmConfigured() && !getPipelineRunning()) {
+      consume(getDb(), "hunt");
+      startPipeline(getDb(), { search: openRouterSearch, llm: openRouterLlm }, { count: 10, focus });
+    }
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Could not start the search.";
   }
-  redirect("/leads");
+  redirect(error ? `/leads?error=${encodeURIComponent(error)}` : "/leads");
 }
 
 /** Approve a lead's pending outreach as written. */

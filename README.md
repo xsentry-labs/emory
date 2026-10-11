@@ -25,7 +25,9 @@ One deployable unit: a single Railway container with a volume.
 - **Research**: "Research & score with AI" on a lead fetches its website (SSRF-guarded, `lib/safeFetch.ts`), has the LLM rate ICP fit and BANT against your offer/ICP, and stores the summary, rationale and score (`lib/research.ts`). Ratings stay editable by hand.
 - **Sending**: the worker emails approved messages over SMTP (`lib/send.ts`, `lib/mailer.ts`). Off unless `SMTP_URL` and `FROM_EMAIL` are set. It only sends what a human approved, caps volume (`SEND_DAILY_CAP`, rolling 24h), retries a failure up to 3 times, threads follow-ups onto earlier emails, skips leads without a valid address, and never sends a follow-up after the lead replied. Set `EMAIL_FOOTER` to add your postal address and an opt-out line to every email.
 - **Replies**: the worker polls an IMAP inbox (`lib/imap.ts`, off unless `IMAP_HOST`/`IMAP_USER`/`IMAP_PASS` are set) and logs replies to the right lead, matched by `In-Reply-To`/`References` and falling back to the sender address (`lib/inbound.ts`). Quoted text is stripped; out-of-office, bounces and duplicates are ignored. A logged reply marks the lead `replied` and stops follow-ups. It tracks the last UID and starts from "now" on first run, so old mail is not imported; read/unread flags are untouched.
-- **Auth**: one shared `ADMIN_PASSWORD` over HTTP Basic Auth (`middleware.ts`). `/api/health` is open.
+- **Accounts and isolation**: users sign up with email, password and a shared `INVITE_CODE` (`app/auth/actions.ts`). Logins live in `accounts.db`; **every workspace has its own SQLite file** (`workspaces/<id>.db`), so one customer's data can never appear in another's. Sessions are signed cookies verified in `middleware.ts`, which also stamps the verified workspace onto the request. `/api/health` is open. Data from the earlier single-user version is moved to workspace 1, and the first person to sign up owns it.
+- **Spend guard**: each workspace is capped per UTC day (`lib/usage.ts`): 3 lead hunts, 5 business setups, 40 other AI actions (override with `LIMIT_*` variables).
+- **Server mailbox**: the SMTP/IMAP mailbox from the environment belongs to ONE workspace, named by `SENDING_WORKSPACE_ID`; all others copy approved drafts into their own mail app. Without that variable nothing is sent from the server.
 
 The SQLite file lives on the volume, so run exactly **one replica** (set in `railway.json`).
 
@@ -51,5 +53,5 @@ Requires Node 22+.
 
 1. New service from this repo (it uses the `Dockerfile`).
 2. Add a **volume** and mount it at `/data`.
-3. Set variables: `ADMIN_PASSWORD` (required), `DATA_DIR=/data` (already the image default).
+3. Set variables: `SESSION_SECRET` (required, a long random string), `INVITE_CODE` (required to allow sign-ups), `OPENROUTER_API_KEY`, and `DATA_DIR=/data` (already the image default). `ADMIN_PASSWORD` from older deployments still works as the session secret.
 4. Keep replicas at 1. Health check is `/api/health`.
