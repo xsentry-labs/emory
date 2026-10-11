@@ -119,7 +119,7 @@ describe("sendApproved", () => {
 
 describe("sendConfig", () => {
   it("is off without SMTP_URL and FROM_EMAIL, and parses options", () => {
-    expect(sendConfig({})).toBeNull();
+    expect(sendConfig({} as never)).toBeNull();
     expect(sendConfig({ SMTP_URL: "smtp://x" } as never)).toBeNull();
     const c = sendConfig({ SMTP_URL: "smtp://x", FROM_EMAIL: "a@b.co", EMAIL_FOOTER: "Line1\\nLine2", SEND_DAILY_CAP: "5" } as never)!;
     expect(c).toMatchObject({ footer: "Line1\nLine2", dailyCap: 5 });

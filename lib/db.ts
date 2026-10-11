@@ -62,6 +62,9 @@ const MIGRATIONS: string[] = [
   ALTER TABLE messages ADD COLUMN send_attempts INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE messages ADD COLUMN send_error TEXT NOT NULL DEFAULT '';
   `,
+  `
+  CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+  `,
 ];
 
 export function migrate(db: DB): void {
