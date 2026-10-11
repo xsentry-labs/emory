@@ -38,6 +38,9 @@ export interface Message {
   created_at: number;
   decided_at: number | null;
   sent_at: number | null;
+  message_id: string;
+  send_attempts: number;
+  send_error: string;
 }
 
 export interface Profile {

@@ -57,6 +57,11 @@ const MIGRATIONS: string[] = [
   ALTER TABLE prospects ADD COLUMN score_rationale TEXT NOT NULL DEFAULT '';
   ALTER TABLE prospects ADD COLUMN researched_at INTEGER;
   `,
+  `
+  ALTER TABLE messages ADD COLUMN message_id TEXT NOT NULL DEFAULT '';
+  ALTER TABLE messages ADD COLUMN send_attempts INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE messages ADD COLUMN send_error TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 export function migrate(db: DB): void {
