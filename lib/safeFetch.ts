@@ -102,3 +102,59 @@ export async function fetchPageText(input: string, maxBytes = 300_000): Promise<
   }
   throw new Error("Too many redirects");
 }
+
+export interface RawPage {
+  /** Final URL after redirects. */
+  url: string;
+  status: number;
+  contentType: string;
+  body: string;
+  ms: number;
+  /** True if at least one redirect was followed. */
+  redirected: boolean;
+}
+
+/**
+ * Like fetchPageText but returns the raw response (including non-2xx), for
+ * crawling. Still public-addresses-only on every hop, with time/size caps.
+ * Throws only on network, SSRF or redirect-loop failures.
+ */
+export async function fetchRaw(input: string, maxBytes = 500_000): Promise<RawPage> {
+  let url = normalizeUrl(input);
+  if (!url) throw new Error("Invalid URL");
+  const started = Date.now();
+  for (let hop = 0; hop < 5; hop++) {
+    await assertPublic(url);
+    const res = await fetch(url, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+      headers: { "user-agent": "EmoryGrowthBot/1.0 (+site audit)", accept: "text/html,application/xhtml+xml,text/plain,*/*;q=0.5" },
+    });
+    const location = res.headers.get("location");
+    if (res.status >= 300 && res.status < 400 && location) {
+      const next = normalizeUrl(new URL(location, url).href);
+      if (!next) throw new Error("Bad redirect");
+      url = next;
+      continue;
+    }
+    const contentType = res.headers.get("content-type") ?? "";
+    let body = "";
+    if (res.body && /text|xml|json|html/i.test(contentType || "text/html")) {
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let size = 0;
+      while (size < maxBytes) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+        size += value.length;
+      }
+      await reader.cancel().catch(() => {});
+      body = Buffer.concat(chunks).toString("utf-8");
+    } else {
+      await res.body?.cancel().catch(() => {});
+    }
+    return { url: url.href, status: res.status, contentType, body, ms: Date.now() - started, redirected: hop > 0 };
+  }
+  throw new Error("Too many redirects");
+}

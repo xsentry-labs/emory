@@ -138,7 +138,7 @@ describe("usage limits", () => {
     expect(dailyLimit("hunt", {})).toBe(3);
     expect(dailyLimit("hunt", { LIMIT_HUNTS_PER_DAY: "7" })).toBe(7);
     expect(dailyLimit("hunt", { LIMIT_HUNTS_PER_DAY: "-1" })).toBe(3);
-    expect(usageSummary(openDb(":memory:")).map((u) => u.kind)).toEqual(["hunt", "onboarding", "ai"]);
+    expect(usageSummary(openDb(":memory:")).map((u) => u.kind)).toEqual(["hunt", "onboarding", "ai", "seo"]);
   });
 });
 
