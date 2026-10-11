@@ -76,6 +76,17 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE prospects ADD COLUMN linkedin_url TEXT NOT NULL DEFAULT '';
   `,
+  `
+  CREATE TABLE seo_audits (
+    id INTEGER PRIMARY KEY,
+    site TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running','done','error')),
+    error TEXT NOT NULL DEFAULT '',
+    report_json TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER
+  );
+  `,
 ];
 
 export function migrate(db: DB): void {

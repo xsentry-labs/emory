@@ -1,0 +1,121 @@
+import type { DB } from "../db";
+import type { StructuredLlm } from "../llm";
+import { getBusiness, getProfile } from "../repo";
+import { fetchRaw } from "../safeFetch";
+import { runChecks, scoreSite, type Issue, type PageData } from "./checks";
+import { crawlSite, type Fetcher } from "./crawl";
+import { buildPlan, type SeoPlan } from "./plan";
+
+export interface SeoReport {
+  site: string;
+  score: number;
+  pagesCrawled: number;
+  unreachable: string[];
+  issues: Issue[];
+  /** Per-page snapshot for the report table. */
+  pages: Pick<PageData, "url" | "status" | "title" | "description" | "words" | "ms">[];
+  plan: SeoPlan | null;
+  /** Set if the AI plan failed; the automated findings are still valid. */
+  planError: string;
+}
+
+export interface SeoAuditRow {
+  id: number;
+  site: string;
+  status: "running" | "done" | "error";
+  error: string;
+  report: SeoReport | null;
+  created_at: number;
+  finished_at: number | null;
+}
+
+interface Raw {
+  id: number;
+  site: string;
+  status: SeoAuditRow["status"];
+  error: string;
+  report_json: string;
+  created_at: number;
+  finished_at: number | null;
+}
+
+const toRow = (r: Raw): SeoAuditRow => ({
+  id: r.id,
+  site: r.site,
+  status: r.status,
+  error: r.error,
+  report: r.report_json ? (JSON.parse(r.report_json) as SeoReport) : null,
+  created_at: r.created_at,
+  finished_at: r.finished_at,
+});
+
+export function latestAudit(db: DB): SeoAuditRow | null {
+  const r = db.prepare(`SELECT * FROM seo_audits ORDER BY id DESC LIMIT 1`).get() as Raw | undefined;
+  if (!r) return null;
+  // A "running" audit whose process is gone (restart) can never finish.
+  if (r.status === "running" && !running().has(db)) {
+    return toRow({ ...r, status: "error", error: "Interrupted by a restart. Run it again." });
+  }
+  return toRow(r);
+}
+
+const g = globalThis as unknown as { __emorySeoRunning?: WeakSet<DB> };
+const running = (): WeakSet<DB> => (g.__emorySeoRunning ??= new WeakSet());
+
+export interface AuditDeps {
+  llm: StructuredLlm | null;
+  fetchPage?: Fetcher;
+  maxPages?: number;
+}
+
+/** Crawl, check, and (if an LLM is available) write the fix plan. Persists the result. Awaitable for tests. */
+export async function runAudit(db: DB, id: number, site: string, deps: AuditDeps): Promise<void> {
+  try {
+    const crawl = await crawlSite(site, deps.fetchPage ?? fetchRaw, deps.maxPages);
+    if (crawl.pages.length === 0) throw new Error("We couldn't read any pages on that site.");
+    const issues = runChecks(crawl.pages, crawl.site);
+    const score = scoreSite(issues, crawl.pages.length);
+    const profile = getProfile(db);
+
+    let plan: SeoPlan | null = null;
+    let planError = "";
+    if (deps.llm) {
+      try {
+        plan = await buildPlan(deps.llm, { site, offer: profile.offer, icp: profile.icp, issues, pages: crawl.pages, score });
+      } catch (err) {
+        planError = err instanceof Error ? err.message.slice(0, 200) : "The fix plan could not be written.";
+      }
+    } else {
+      planError = "AI is not configured, so only the automated findings are shown.";
+    }
+
+    const report: SeoReport = {
+      site,
+      score,
+      pagesCrawled: crawl.pages.length,
+      unreachable: crawl.unreachable.slice(0, 10),
+      issues,
+      pages: crawl.pages.map(({ url, status, title, description, words, ms }) => ({ url, status, title, description, words, ms })),
+      plan,
+      planError,
+    };
+    db.prepare(`UPDATE seo_audits SET status = 'done', report_json = ?, finished_at = ? WHERE id = ?`).run(JSON.stringify(report), Date.now(), id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message.slice(0, 300) : "The audit failed.";
+    console.error("[seo] audit failed:", message);
+    db.prepare(`UPDATE seo_audits SET status = 'error', error = ?, finished_at = ? WHERE id = ?`).run(message, Date.now(), id);
+  }
+}
+
+/** Start an audit in the background. Returns false if one is already running for this workspace. */
+export function startAudit(db: DB, deps: AuditDeps, siteInput?: string): boolean {
+  if (running().has(db)) return false;
+  const site = (siteInput ?? "").trim() || getBusiness(db).website;
+  if (!site) throw new Error("Enter your website address first.");
+  const id = Number(
+    db.prepare(`INSERT INTO seo_audits (site, status, created_at) VALUES (?, 'running', ?)`).run(site, Date.now()).lastInsertRowid,
+  );
+  running().add(db);
+  void runAudit(db, id, site, deps).finally(() => running().delete(db));
+  return true;
+}
