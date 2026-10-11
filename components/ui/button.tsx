@@ -14,7 +14,7 @@ const buttonVariants = cva(
         outline: "border border-line bg-paper text-ink hover:border-ink/35 hover:bg-wash",
         ghost: "text-mute hover:bg-wash hover:text-ink",
         quiet: "text-mute underline-offset-4 hover:text-ink hover:underline",
-        danger: "border border-agent-guard/30 bg-paper text-agent-guard hover:bg-agent-guard hover:text-paper",
+        danger: "border border-danger/30 bg-paper text-danger hover:bg-danger hover:text-paper",
       },
       size: {
         default: "h-9 px-4 text-sm",

@@ -1,9 +1,8 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Emory. The brand is black and white; the agents carry the colour.
- * Agent colours are functional — they only appear where an agent owns the
- * thing being shown. No gradients, no tints, no secondary palettes.
+ * Emory. The brand is black and white. The one functional colour is
+ * `danger`, for destructive or rejected states. No gradients, no tints.
  */
 const config: Config = {
   content: [
@@ -31,19 +30,7 @@ const config: Config = {
         wash: "var(--wash)",
         line: "var(--line)",
         mute: "var(--mute)",
-        agent: {
-          audit: "#4A5568",
-          scout: "#2F6B3F",
-          beacon: "#FF6B1A",
-          write: "#3A3A3D",
-          studio: "#F5C400",
-          media: "#1B6FD4",
-          envoy: "#0E9AA7",
-          forge: "#B23A28",
-          hunt: "#6B3FA0",
-          ledge: "#24386B",
-          guard: "#6B1218",
-        },
+        danger: "#6B1218",
       },
       fontFamily: {
         display: ["var(--font-display)", "Newsreader", "Georgia", "serif"],
@@ -72,8 +59,7 @@ const config: Config = {
         pop: "0 2px 8px rgb(13 13 15 / 0.06), 0 24px 56px -28px rgb(13 13 15 / 0.28)",
       },
       keyframes: {
-        // Motion lives in two places only: analysis progress, and approval
-        // queue state changes. Nothing else in the product animates.
+        // Motion lives in one place: approval queue state changes.
         "queue-out": {
           from: { opacity: "1", transform: "translateY(0)" },
           to: { opacity: "0", transform: "translateY(-4px)" },
