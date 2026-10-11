@@ -14,6 +14,8 @@ import {
   setProspectStatus,
 } from "@/lib/repo";
 import { PROSPECT_STATUSES } from "@/lib/types";
+import { draftMessage } from "@/lib/draft";
+import { isLlmConfigured, openRouterLlm } from "@/lib/llm";
 
 const text = (max: number) => z.string().trim().max(max);
 const id = z.coerce.number().int().positive();
@@ -91,4 +93,18 @@ export async function updateProfile(formData: FormData) {
   const input = z.object({ offer: text(3000), icp: text(3000) }).parse(Object.fromEntries(formData));
   saveProfile(getDb(), input);
   revalidatePath("/profile");
+}
+
+export async function generateDraft(formData: FormData) {
+  const input = z.object({ prospectId: id, kind: z.enum(["outreach", "followup"]) }).parse(Object.fromEntries(formData));
+  let error = "";
+  try {
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    await draftMessage(getDb(), openRouterLlm, input.prospectId, input.kind);
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Drafting failed.";
+  }
+  revalidatePath(`/prospects/${input.prospectId}`);
+  revalidatePath("/approvals");
+  if (error) redirect(`/prospects/${input.prospectId}?error=${encodeURIComponent(error)}`);
 }
