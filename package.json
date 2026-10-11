@@ -20,7 +20,9 @@
     "better-sqlite3": "^13.0.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "imapflow": "^2.4.0",
     "lucide-react": "^0.469.0",
+    "mailparser": "^3.9.38",
     "next": "^14.2.20",
     "nodemailer": "^10.1.0",
     "openai": "^7.32.0",
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "@types/mailparser": "^3.9.0",
     "@types/node": "^20.17.10",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^18.3.18",

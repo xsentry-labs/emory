@@ -123,13 +123,13 @@ export function decideDraft(
 }
 
 /** Record an inbound reply: stops the follow-up clock and marks the prospect as replied. */
-export function logReply(db: DB, prospectId: number, body: string): void {
+export function logReply(db: DB, prospectId: number, body: string, messageId = ""): void {
   const t = now();
   db.transaction(() => {
     db.prepare(
-      `INSERT INTO messages (prospect_id, direction, kind, subject, body, status, created_at)
-       VALUES (?, 'inbound', 'reply', '', ?, 'received', ?)`,
-    ).run(prospectId, body, t);
+      `INSERT INTO messages (prospect_id, direction, kind, subject, body, status, created_at, message_id)
+       VALUES (?, 'inbound', 'reply', '', ?, 'received', ?, ?)`,
+    ).run(prospectId, body, t, messageId);
     db.prepare(
       `UPDATE prospects SET status = 'replied', next_followup_at = NULL, updated_at = ? WHERE id = ?`,
     ).run(t, prospectId);
