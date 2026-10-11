@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { addDraft, addReply, changeStatus, generateDraft, qualify } from "@/app/actions";
+import { addDraft, addReply, changeStatus, generateDraft, qualify, research } from "@/app/actions";
 import { PageHead } from "@/components/page-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +72,29 @@ export default function ProspectPage({
       />
 
       {prospect.notes ? <p className="measure mb-8 whitespace-pre-wrap text-mute">{prospect.notes}</p> : null}
+
+      <form action={research} className="card mb-6 flex flex-wrap items-center gap-3 p-5">
+        <input type="hidden" name="prospectId" value={prospect.id} />
+        <Button type="submit" variant="outline" disabled={!isLlmConfigured()}>
+          Research &amp; score with AI
+        </Button>
+        <span className="text-sm text-mute">
+          {isLlmConfigured()
+            ? "Reads the lead's website and notes, then rates ICP fit and BANT. You can adjust the ratings below."
+            : "Set OPENROUTER_API_KEY to enable AI research."}
+        </span>
+      </form>
+
+      {prospect.research_summary ? (
+        <div className="card mb-6 space-y-2 p-5">
+          <h2 className="font-display text-h3">Research</h2>
+          <p className="whitespace-pre-wrap">{prospect.research_summary}</p>
+          {prospect.score_rationale ? <p className="text-sm text-mute">Why this score: {prospect.score_rationale}</p> : null}
+          {prospect.researched_at ? (
+            <p className="tnum text-caption text-mute">Researched {new Date(prospect.researched_at).toLocaleString()}</p>
+          ) : null}
+        </div>
+      ) : null}
 
       <form action={qualify} className="card mb-8 space-y-4 p-5">
         <div className="flex items-baseline justify-between">
