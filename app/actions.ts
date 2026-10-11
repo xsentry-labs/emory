@@ -16,7 +16,8 @@ import {
 import { PROSPECT_STATUSES } from "@/lib/types";
 import { draftMessage } from "@/lib/draft";
 import { researchLead } from "@/lib/research";
-import { isLlmConfigured, openRouterLlm } from "@/lib/llm";
+import { sourceLeads } from "@/lib/sourcing";
+import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 
 const text = (max: number) => z.string().trim().max(max);
 const id = z.coerce.number().int().positive();
@@ -121,4 +122,21 @@ export async function research(formData: FormData) {
   }
   revalidatePath("/prospects", "layout");
   if (error) redirect(`/prospects/${input.prospectId}?error=${encodeURIComponent(error)}`);
+}
+
+export async function findLeads(formData: FormData) {
+  const input = z
+    .object({ count: z.coerce.number().int().min(1).max(10), focus: text(300) })
+    .parse(Object.fromEntries(formData));
+  let target = "";
+  try {
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    const r = await sourceLeads(getDb(), openRouterSearch, input);
+    const skipped = r.skipped.duplicate + r.skipped.unverified;
+    target = `/prospects?found=${r.added}&skipped=${skipped}`;
+  } catch (err) {
+    target = `/prospects?error=${encodeURIComponent(err instanceof Error ? err.message : "Lead search failed.")}`;
+  }
+  revalidatePath("/prospects", "layout");
+  redirect(target);
 }

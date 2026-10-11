@@ -13,6 +13,7 @@ One deployable unit: a single Railway container with a volume.
 - **Worker** runs in-process, started from `instrumentation.ts`. Each tick it queues follow-up *drafts* for approval, sends approved emails, and polls the inbox for replies (the last two only when configured, below).
 - **Qualification**: ICP fit plus BANT, each rated 0-3 and combined into a 0-100 score and A/B/C tier (`lib/qualify.ts`). Leads are ranked by score. What you sell and who it is for lives in the `profile` table (Offer & ICP page).
 - **LLM**: calls go through OpenRouter (`lib/llm.ts`, default model `openai/gpt-6-luna`, override with `OPENROUTER_MODEL`). AI drafting (`lib/draft.ts`) writes into the Approvals queue; it needs `OPENROUTER_API_KEY`.
+- **Lead sourcing**: "Find leads with AI" uses OpenRouter's web search (`openRouterSearch`) to propose businesses matching your ICP (`lib/sourcing.ts`). A lead is added only if its website is one of the pages the search cited; duplicates (same site or email) are skipped; emails are kept only if shown publicly. New leads are unscored until you run research.
 - **Research**: "Research & score with AI" on a lead fetches its website (SSRF-guarded, `lib/safeFetch.ts`), has the LLM rate ICP fit and BANT against your offer/ICP, and stores the summary, rationale and score (`lib/research.ts`). Ratings stay editable by hand.
 - **Sending**: the worker emails approved messages over SMTP (`lib/send.ts`, `lib/mailer.ts`). Off unless `SMTP_URL` and `FROM_EMAIL` are set. It only sends what a human approved, caps volume (`SEND_DAILY_CAP`, rolling 24h), retries a failure up to 3 times, threads follow-ups onto earlier emails, skips leads without a valid address, and never sends a follow-up after the lead replied. Set `EMAIL_FOOTER` to add your postal address and an opt-out line to every email.
 - **Replies**: the worker polls an IMAP inbox (`lib/imap.ts`, off unless `IMAP_HOST`/`IMAP_USER`/`IMAP_PASS` are set) and logs replies to the right lead, matched by `In-Reply-To`/`References` and falling back to the sender address (`lib/inbound.ts`). Quoted text is stripped; out-of-office, bounces and duplicates are ignored. A logged reply marks the lead `replied` and stops follow-ups. It tracks the last UID and starts from "now" on first run, so old mail is not imported; read/unread flags are untouched.
@@ -20,9 +21,11 @@ One deployable unit: a single Railway container with a volume.
 
 The SQLite file lives on the volume, so run exactly **one replica** (set in `railway.json`).
 
-## Not built yet
+## Limits
 
-- Lead sourcing (leads are added by hand; the `source` field records where they came from).
+- Lead sourcing quality depends on the model and its web search; always review new leads. Most sourced leads will have no public email, so add one before they can be emailed.
+- Replies from a different address than the lead's (forwarded, assistant) that don't thread are not matched.
+- There is no unsubscribe handling beyond the footer text you configure.
 
 ## Develop
 

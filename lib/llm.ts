@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { z } from "zod";
+import type { Searcher } from "./sourcing";
 
 /**
  * Structured-output LLM calls through OpenRouter (OpenAI-compatible API), so
@@ -55,4 +56,34 @@ export const openRouterLlm: StructuredLlm = async ({ system, user, schema }) => 
     }
   }
   throw new Error(`The model did not return valid output (${lastError}).`);
+};
+
+/**
+ * Web-search-backed call via OpenRouter's `web` plugin. Returns the reply text
+ * and the domains of the pages it cited, so callers can verify claims against
+ * real sources.
+ */
+export const openRouterSearch: Searcher = async ({ system, user }) => {
+  const res = await getClient().chat.completions.create({
+    model: llmModel(),
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    plugins: [{ id: "web", max_results: 10 }],
+  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
+  const message = res.choices[0]?.message as
+    | { content?: string | null; annotations?: { type?: string; url_citation?: { url?: string } }[] }
+    | undefined;
+  const citedDomains: string[] = [];
+  for (const a of message?.annotations ?? []) {
+    const url = a.type === "url_citation" ? a.url_citation?.url : undefined;
+    if (!url) continue;
+    try {
+      citedDomains.push(new URL(url).hostname);
+    } catch {
+      /* ignore malformed citation urls */
+    }
+  }
+  return { text: message?.content ?? "", citedDomains };
 };
