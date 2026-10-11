@@ -109,6 +109,11 @@ export function LeadsTable({ initial }: { initial: LeadsPayload }) {
                     </Link>
                     {l.company && l.company !== l.name ? <div className="text-mute">{l.company}</div> : null}
                     {l.website ? <div className="text-caption text-mute">{l.website.replace(/^https?:\/\//, "")}</div> : null}
+                    {l.linkedinUrl ? (
+                      <a href={l.linkedinUrl} target="_blank" rel="noopener noreferrer" className="mr-2 text-caption text-mute underline">
+                        LinkedIn
+                      </a>
+                    ) : null}
                     {l.sourceUrl ? (
                       <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-caption text-mute underline">
                         Source

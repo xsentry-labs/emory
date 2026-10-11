@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { addDraft, addReply, changeStatus, generateDraft, qualify, research } from "@/app/actions";
+import { addDraft, addReply, changeStatus, generateDraft, qualify, research, saveContact } from "@/app/actions";
 import { PageHead } from "@/components/page-head";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,26 @@ export default function ProspectPage({
           </a>
         </p>
       ) : null}
+
+      <form action={saveContact} className="card mb-6 flex flex-wrap items-end gap-3 p-5">
+        <input type="hidden" name="prospectId" value={prospect.id} />
+        <div className="min-w-56 flex-1 space-y-1.5">
+          <Label htmlFor="contact-email">Email</Label>
+          <Input id="contact-email" name="email" type="email" defaultValue={prospect.email} maxLength={320} placeholder="name@company.com" />
+        </div>
+        <div className="min-w-56 flex-1 space-y-1.5">
+          <Label htmlFor="contact-linkedin">LinkedIn</Label>
+          <Input id="contact-linkedin" name="linkedin_url" defaultValue={prospect.linkedin_url} maxLength={300} placeholder="linkedin.com/in/..." />
+        </div>
+        <Button type="submit" variant="outline">
+          Save contact
+        </Button>
+        {prospect.linkedin_url ? (
+          <a href={prospect.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-sm underline">
+            Open LinkedIn
+          </a>
+        ) : null}
+      </form>
 
       <form action={research} className="card mb-6 flex flex-wrap items-center gap-3 p-5">
         <input type="hidden" name="prospectId" value={prospect.id} />
