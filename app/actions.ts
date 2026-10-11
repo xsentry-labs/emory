@@ -16,6 +16,9 @@ import {
 import { PROSPECT_STATUSES } from "@/lib/types";
 import { draftMessage } from "@/lib/draft";
 import { researchLead } from "@/lib/research";
+import { readUploads, countWords, MAX_DESCRIPTION_WORDS } from "@/lib/documents";
+import { runOnboarding } from "@/lib/onboarding";
+import { startPipeline } from "@/lib/pipeline";
 import { sourceLeads } from "@/lib/sourcing";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 
@@ -139,4 +142,50 @@ export async function findLeads(formData: FormData) {
   }
   revalidatePath("/prospects", "layout");
   redirect(target);
+}
+
+/** Step 1: read the website and pre-fill what we think the business does. */
+export async function submitWebsite(formData: FormData) {
+  const website = String(formData.get("website") ?? "").trim();
+  redirect(`/start?step=2&website=${encodeURIComponent(website)}`);
+}
+
+/** Step 2: build the profile from website + description + docs, then start finding leads. */
+export async function submitBusiness(formData: FormData) {
+  const website = String(formData.get("website") ?? "").trim();
+  const description = String(formData.get("description") ?? "");
+  let error = "";
+  try {
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    if (countWords(description) > MAX_DESCRIPTION_WORDS) {
+      throw new Error(`Please keep the description under ${MAX_DESCRIPTION_WORDS} words.`);
+    }
+    const files = formData.getAll("docs").filter((f): f is File => f instanceof File);
+    const docs = await readUploads(files);
+    await runOnboarding(getDb(), openRouterLlm, { website, description, docs });
+    startPipeline(getDb(), { search: openRouterSearch, llm: openRouterLlm }, { count: 10 });
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Something went wrong.";
+  }
+  if (error) {
+    redirect(`/start?step=2&website=${encodeURIComponent(website)}&error=${encodeURIComponent(error)}`);
+  }
+  redirect("/leads");
+}
+
+/** Run the finder + research + drafting pipeline again for more leads. */
+export async function findMoreLeads(formData: FormData) {
+  const focus = z.string().trim().max(300).parse(String(formData.get("focus") ?? ""));
+  if (isLlmConfigured()) {
+    startPipeline(getDb(), { search: openRouterSearch, llm: openRouterLlm }, { count: 10, focus });
+  }
+  redirect("/leads");
+}
+
+/** Approve a lead's pending outreach as written. */
+export async function approveDraft(formData: FormData) {
+  const input = z.object({ id }).parse(Object.fromEntries(formData));
+  decideDraft(getDb(), input.id, "approved");
+  revalidatePath("/leads");
+  revalidatePath("/approvals");
 }

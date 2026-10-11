@@ -65,6 +65,11 @@ const MIGRATIONS: string[] = [
   `
   CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
   `,
+  `
+  ALTER TABLE profile ADD COLUMN website TEXT NOT NULL DEFAULT '';
+  ALTER TABLE profile ADD COLUMN context TEXT NOT NULL DEFAULT '';
+  ALTER TABLE profile ADD COLUMN onboarded_at INTEGER;
+  `,
 ];
 
 export function migrate(db: DB): void {
