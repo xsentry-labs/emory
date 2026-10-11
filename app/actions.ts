@@ -20,6 +20,7 @@ import { readUploads, countWords, MAX_DESCRIPTION_WORDS } from "@/lib/documents"
 import { consume } from "@/lib/usage";
 import { runOnboarding } from "@/lib/onboarding";
 import { getPipeline, startPipeline } from "@/lib/pipeline";
+import { playById } from "@/lib/plays";
 import { sourceLeads } from "@/lib/sourcing";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 
@@ -202,4 +203,26 @@ export async function approveDraft(formData: FormData) {
   decideDraft(getDb(), input.id, "approved");
   revalidatePath("/leads");
   revalidatePath("/approvals");
+}
+
+/** Launch a play: a lead hunt focused on one buying signal. */
+export async function runPlay(formData: FormData) {
+  const { play: playId } = z.object({ play: z.string().min(1).max(60) }).parse(Object.fromEntries(formData));
+  let error = "";
+  try {
+    const play = playById(playId);
+    if (!play || play.locked) throw new Error("That play isn't available yet.");
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    if (getPipeline(getDb()).status !== "running") {
+      consume(getDb(), "hunt");
+      startPipeline(
+        getDb(),
+        { search: openRouterSearch, llm: openRouterLlm },
+        { count: play.leads, focus: play.focus, label: play.title },
+      );
+    }
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Could not start the play.";
+  }
+  redirect(error ? `/plays?error=${encodeURIComponent(error)}` : "/leads");
 }
