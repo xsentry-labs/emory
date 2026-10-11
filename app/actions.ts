@@ -29,6 +29,7 @@ import { runOnboarding } from "@/lib/onboarding";
 import { getPipeline, startPipeline } from "@/lib/pipeline";
 import { playById } from "@/lib/plays";
 import { startAudit } from "@/lib/seo/audit";
+import { deleteItem, draftXPosts, suggestTopics, updateItem, writePost, type ContentStatus } from "@/lib/content";
 import { sourceLeads } from "@/lib/sourcing";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 
@@ -285,4 +286,59 @@ export async function setWorkspacePlan(formData: FormData) {
   if (!isPlanId(input.plan) || !listWorkspaceIds(getAccountsDb()).includes(input.workspaceId)) throw new Error("Invalid plan or workspace");
   setPlan(getWorkspaceDb(input.workspaceId), input.plan);
   revalidatePath("/admin");
+}
+
+// --- content ----------------------------------------------------------------
+
+/** Run an AI content action, then return to the content page (or show the error). */
+async function contentAction(tab: "blog" | "x", work: () => Promise<string | void>): Promise<never> {
+  let error = "";
+  let to = `/content?tab=${tab}`;
+  try {
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    consume(getDb(), "ai");
+    charge(getDb(), "ai");
+    const next = await work();
+    if (typeof next === "string") to = next;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Something went wrong.";
+  }
+  revalidatePath("/content");
+  return redirect(error ? `/content?tab=${tab}&error=${encodeURIComponent(error)}` : to);
+}
+
+export async function suggestBlogTopics() {
+  return contentAction("blog", async () => {
+    await suggestTopics(getDb(), openRouterLlm);
+  });
+}
+
+export async function writeBlogPost(formData: FormData) {
+  const { id: ideaId } = z.object({ id }).parse(Object.fromEntries(formData));
+  return contentAction("blog", async () => `/content/${await writePost(getDb(), openRouterLlm, ideaId)}`);
+}
+
+export async function draftWeekOfPosts() {
+  return contentAction("x", async () => {
+    await draftXPosts(getDb(), openRouterLlm);
+  });
+}
+
+export async function saveContentItem(formData: FormData) {
+  const input = z.object({ id, title: text(300), body: text(40000) }).parse(Object.fromEntries(formData));
+  updateItem(getDb(), input.id, { title: input.title, body: input.body });
+  revalidatePath("/content", "layout");
+}
+
+export async function setContentStatus(formData: FormData) {
+  const input = z.object({ id, status: z.enum(["draft", "done"]) }).parse(Object.fromEntries(formData));
+  updateItem(getDb(), input.id, { status: input.status as ContentStatus });
+  revalidatePath("/content", "layout");
+}
+
+export async function removeContentItem(formData: FormData) {
+  const input = z.object({ id, back: z.enum(["blog", "x"]) }).parse(Object.fromEntries(formData));
+  deleteItem(getDb(), input.id);
+  revalidatePath("/content", "layout");
+  redirect(`/content?tab=${input.back}`);
 }

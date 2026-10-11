@@ -51,7 +51,7 @@ function sections(pending: number): { title: string; items: Item[] }[] {
       title: "Marketing",
       items: [
         { href: "/seo", label: "SEO", icon: Search },
-        { href: "/content", label: "Content", icon: PenLine, soon: true },
+        { href: "/content", label: "Content", icon: PenLine },
         { href: "/reddit", label: "Reddit agent", icon: MessagesSquare, locked: true },
       ],
     },
