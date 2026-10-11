@@ -5,6 +5,7 @@ const nextConfig = {
   output: "standalone",
   experimental: {
     instrumentationHook: true,
+    serverActions: { bodySizeLimit: "30mb" },
     serverComponentsExternalPackages: ["better-sqlite3"],
   },
 };

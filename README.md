@@ -4,6 +4,14 @@ A growth agent for anyone who sells a service (agencies, B2B startups, consultan
 
 Emory Marketing (executing marketing for a customer's own clients) is a possible second product and is not built.
 
+## How it works
+
+1. **Your website** (`/start`): enter your URL.
+2. **Your service**: describe what you do (up to 5,000 words) and optionally upload docs (PDF, TXT, MD, CSV, HTML; 5 files, 5 MB each). We build your offer and ideal customer profile from the website, text and documents (`lib/onboarding.ts`).
+3. **Your leads** (`/leads`): a background pipeline (`lib/pipeline.ts`) finds leads for your ICP, then researches and scores each one (ICP fit + BANT) and writes its first outreach. The table fills in live (it polls `/api/leads`) and stays ranked by score. Approve outreach inline; approved messages are sent by the worker.
+
+Open `/` to land on the right place: `/start` until onboarding is done, then `/leads`.
+
 ## Architecture
 
 One deployable unit: a single Railway container with a volume.

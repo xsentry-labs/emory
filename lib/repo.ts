@@ -50,6 +50,51 @@ export function saveProfile(db: DB, p: Profile): void {
   db.prepare(`UPDATE profile SET offer = ?, icp = ? WHERE id = 1`).run(p.offer, p.icp);
 }
 
+export interface Business {
+  website: string;
+  context: string;
+  onboardedAt: number | null;
+}
+
+export function getBusiness(db: DB): Business {
+  const r = db.prepare(`SELECT website, context, onboarded_at FROM profile WHERE id = 1`).get() as {
+    website: string;
+    context: string;
+    onboarded_at: number | null;
+  };
+  return { website: r.website, context: r.context, onboardedAt: r.onboarded_at };
+}
+
+/** Save the website and raw business context, and mark onboarding complete. */
+export function saveBusiness(db: DB, b: { website: string; context: string }): void {
+  db.prepare(`UPDATE profile SET website = ?, context = ?, onboarded_at = ? WHERE id = 1`).run(
+    b.website,
+    b.context,
+    now(),
+  );
+}
+
+export interface LeadRow extends Prospect {
+  draft_id: number | null;
+  draft_subject: string | null;
+  draft_body: string | null;
+  draft_status: string | null;
+}
+
+/** Every lead, best score first, with its most recent outbound message (if any). */
+export function listLeadsWithDrafts(db: DB): LeadRow[] {
+  return db
+    .prepare(
+      `SELECT p.*, m.id AS draft_id, m.subject AS draft_subject, m.body AS draft_body, m.status AS draft_status
+       FROM prospects p
+       LEFT JOIN messages m ON m.id = (
+         SELECT id FROM messages WHERE prospect_id = p.id AND direction = 'outbound'
+           AND status IN ('draft','approved','sent') ORDER BY id DESC LIMIT 1)
+       ORDER BY p.score IS NULL, p.score DESC, p.id DESC`,
+    )
+    .all() as LeadRow[];
+}
+
 /** Store the five qualification inputs and the derived 0-100 score. */
 export function saveQualification(db: DB, id: number, q: Qualification): void {
   const { score } = scoreLead(q);
