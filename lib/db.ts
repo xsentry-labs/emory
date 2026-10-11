@@ -70,6 +70,9 @@ const MIGRATIONS: string[] = [
   ALTER TABLE profile ADD COLUMN context TEXT NOT NULL DEFAULT '';
   ALTER TABLE profile ADD COLUMN onboarded_at INTEGER;
   `,
+  `
+  ALTER TABLE prospects ADD COLUMN source_url TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 export function migrate(db: DB): void {

@@ -109,6 +109,11 @@ export function LeadsTable({ initial }: { initial: LeadsPayload }) {
                     </Link>
                     {l.company && l.company !== l.name ? <div className="text-mute">{l.company}</div> : null}
                     {l.website ? <div className="text-caption text-mute">{l.website.replace(/^https?:\/\//, "")}</div> : null}
+                    {l.sourceUrl ? (
+                      <a href={l.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-caption text-mute underline">
+                        Source
+                      </a>
+                    ) : null}
                     {!l.email ? <div className="text-caption text-mute">no email yet</div> : null}
                   </td>
                   <td className="px-3 py-3">
@@ -121,7 +126,9 @@ export function LeadsTable({ initial }: { initial: LeadsPayload }) {
                       <span className="text-caption text-mute">Researching...</span>
                     )}
                   </td>
-                  <td className="px-3 py-3 text-mute">{l.why || (l.score === null ? "" : "")}</td>
+                  <td className="px-3 py-3 text-mute" title={l.why}>
+                    <span className="line-clamp-3">{l.why}</span>
+                  </td>
                   <td className="px-3 py-3">
                     {l.draft ? (
                       <div className="space-y-2">

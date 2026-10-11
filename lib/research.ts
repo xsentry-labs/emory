@@ -14,7 +14,9 @@ const ResearchSchema = z.object({
   budget: rating.describe("Evidence they can pay for it (size, funding, pricing signals)."),
   authority: rating.describe("Whether this contact looks like a decision maker."),
   timing: rating.describe("Evidence it is a priority now (hiring, launches, changes)."),
-  rationale: z.string().describe("Short justification for the ratings, citing only evidence provided."),
+  rationale: z
+    .string()
+    .describe("ONE sentence, at most 30 words: the strongest evidence for the score and the biggest gap. Evidence provided only."),
 });
 
 const SYSTEM = `You research sales leads for someone selling a service and rate them with ICP fit plus BANT.

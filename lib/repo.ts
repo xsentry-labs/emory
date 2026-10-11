@@ -9,15 +9,23 @@ export const FOLLOWUP_DELAY_MS = 3 * DAY;
 
 export function createProspect(
   db: DB,
-  input: { name: string; company?: string; email?: string; website?: string; notes?: string; source?: string },
+  input: {
+    name: string;
+    company?: string;
+    email?: string;
+    website?: string;
+    notes?: string;
+    source?: string;
+    source_url?: string;
+  },
 ): number {
   const t = now();
   const r = db
     .prepare(
-      `INSERT INTO prospects (name, company, email, website, notes, source, created_at, updated_at)
-       VALUES (@name, @company, @email, @website, @notes, @source, @t, @t)`,
+      `INSERT INTO prospects (name, company, email, website, notes, source, source_url, created_at, updated_at)
+       VALUES (@name, @company, @email, @website, @notes, @source, @source_url, @t, @t)`,
     )
-    .run({ company: "", email: "", website: "", notes: "", source: "", ...input, t });
+    .run({ company: "", email: "", website: "", notes: "", source: "", source_url: "", ...input, t });
   return Number(r.lastInsertRowid);
 }
 

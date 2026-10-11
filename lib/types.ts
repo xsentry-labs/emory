@@ -13,6 +13,7 @@ export interface Prospect {
   notes: string;
   status: ProspectStatus;
   source: string;
+  source_url: string;
   icp_fit: number | null;
   bant_budget: number | null;
   bant_authority: number | null;
