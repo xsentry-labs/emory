@@ -30,7 +30,7 @@ const toastVariants = cva(
       variant: {
         default: "border-line",
         /** Only Guard gets colour on a toast, because it is a stop. */
-        blocked: "border-agent-guard/40",
+        blocked: "border-danger/40",
       },
     },
     defaultVariants: { variant: "default" },
