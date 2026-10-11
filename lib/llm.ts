@@ -26,7 +26,7 @@ const getClient = () =>
     apiKey: process.env.OPENROUTER_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
     defaultHeaders: { "X-Title": "Emory Growth" },
-    timeout: 90_000,
+    timeout: 120_000,
     maxRetries: 1,
   }));
 

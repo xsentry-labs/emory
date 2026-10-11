@@ -87,6 +87,19 @@ const MIGRATIONS: string[] = [
     finished_at INTEGER
   );
   `,
+  `
+  CREATE TABLE content_items (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('blog_idea','blog','x_post')),
+    title TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    meta TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL CHECK (status IN ('idea','draft','done')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE INDEX content_kind ON content_items(kind, id);
+  `,
 ];
 
 export function migrate(db: DB): void {
