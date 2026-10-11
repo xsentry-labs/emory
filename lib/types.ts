@@ -19,6 +19,9 @@ export interface Prospect {
   bant_need: number | null;
   bant_timing: number | null;
   score: number | null;
+  research_summary: string;
+  score_rationale: string;
+  researched_at: number | null;
   next_followup_at: number | null;
   created_at: number;
   updated_at: number;

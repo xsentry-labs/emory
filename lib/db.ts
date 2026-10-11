@@ -52,6 +52,11 @@ const MIGRATIONS: string[] = [
   CREATE INDEX prospects_score ON prospects(score);
   CREATE INDEX prospects_followup ON prospects(next_followup_at);
   `,
+  `
+  ALTER TABLE prospects ADD COLUMN research_summary TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN score_rationale TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN researched_at INTEGER;
+  `,
 ];
 
 export function migrate(db: DB): void {

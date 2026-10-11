@@ -15,6 +15,7 @@ import {
 } from "@/lib/repo";
 import { PROSPECT_STATUSES } from "@/lib/types";
 import { draftMessage } from "@/lib/draft";
+import { researchLead } from "@/lib/research";
 import { isLlmConfigured, openRouterLlm } from "@/lib/llm";
 
 const text = (max: number) => z.string().trim().max(max);
@@ -106,5 +107,18 @@ export async function generateDraft(formData: FormData) {
   }
   revalidatePath(`/prospects/${input.prospectId}`);
   revalidatePath("/approvals");
+  if (error) redirect(`/prospects/${input.prospectId}?error=${encodeURIComponent(error)}`);
+}
+
+export async function research(formData: FormData) {
+  const input = z.object({ prospectId: id }).parse(Object.fromEntries(formData));
+  let error = "";
+  try {
+    if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
+    await researchLead(getDb(), openRouterLlm, input.prospectId);
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Research failed.";
+  }
+  revalidatePath("/prospects", "layout");
   if (error) redirect(`/prospects/${input.prospectId}?error=${encodeURIComponent(error)}`);
 }
