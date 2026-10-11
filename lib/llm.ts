@@ -26,6 +26,8 @@ const getClient = () =>
     apiKey: process.env.OPENROUTER_API_KEY,
     baseURL: "https://openrouter.ai/api/v1",
     defaultHeaders: { "X-Title": "Emory Growth" },
+    timeout: 90_000,
+    maxRetries: 1,
   }));
 
 export const openRouterLlm: StructuredLlm = async ({ system, user, schema }) => {
@@ -71,7 +73,7 @@ export const openRouterSearch: Searcher = async ({ system, user }) => {
       { role: "user", content: user },
     ],
     plugins: [{ id: "web", max_results: 10 }],
-  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming);
+  } as OpenAI.Chat.ChatCompletionCreateParamsNonStreaming, { timeout: 180_000 });
   const message = res.choices[0]?.message as
     | { content?: string | null; annotations?: { type?: string; url_citation?: { url?: string } }[] }
     | undefined;
@@ -85,5 +87,6 @@ export const openRouterSearch: Searcher = async ({ system, user }) => {
       /* ignore malformed citation urls */
     }
   }
+  console.log(`[search] model=${llmModel()} citations=${citedDomains.length} chars=${(message?.content ?? "").length}`);
   return { text: message?.content ?? "", citedDomains };
 };

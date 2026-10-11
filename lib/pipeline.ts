@@ -58,7 +58,10 @@ export function startPipeline(db: DB, deps: PipelineDeps, opts: { count?: number
   g.__emoryPipeline = true;
   setKv(db, KEY, JSON.stringify({ ...IDLE, status: "running", phase: "finding", startedAt: Date.now() }));
   void run(db, deps, opts)
-    .catch((err) => save(db, { status: "error", phase: "", error: message(err), finishedAt: Date.now() }))
+    .catch((err) => {
+      console.error("[pipeline] failed:", message(err));
+      save(db, { status: "error", phase: "", error: message(err), finishedAt: Date.now() });
+    })
     .finally(() => {
       g.__emoryPipeline = false;
     });
@@ -69,7 +72,17 @@ const message = (err: unknown) => (err instanceof Error ? err.message : "Somethi
 
 /** Exposed for tests: awaits the whole run instead of fire-and-forget. */
 export async function run(db: DB, deps: PipelineDeps, opts: { count?: number; focus?: string }): Promise<void> {
+  console.log("[pipeline] finding leads");
   const found = await sourceLeads(db, deps.search, { count: opts.count ?? 10, focus: opts.focus });
+  console.log(`[pipeline] added ${found.added}, skipped ${JSON.stringify(found.skipped)}`);
+  if (found.added === 0) {
+    const { duplicate, unverified } = found.skipped;
+    throw new Error(
+      duplicate + unverified === 0
+        ? "The search returned no leads. Try again, or add a focus like an industry or city."
+        : `No new leads: ${unverified} could not be verified as real websites and ${duplicate} were already in your list. Try again or add a focus.`,
+    );
+  }
   const queue = (
     db
       .prepare(
@@ -90,6 +103,7 @@ export async function run(db: DB, deps: PipelineDeps, opts: { count?: number; fo
         await draftMessage(db, deps.llm, id, "outreach");
       } catch (err) {
         lastError = message(err);
+        console.error(`[pipeline] lead ${id} failed: ${lastError}`);
       }
       save(db, { done: ++done });
     }
