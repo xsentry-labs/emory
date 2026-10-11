@@ -91,3 +91,24 @@ describe("qualification", () => {
     expect(getProspect(db, pid)!.next_followup_at).toBeNull();
   });
 });
+
+describe("llm drafting", () => {
+  it("builds a draft from the profile and lead, and queues it for approval", async () => {
+    const { draftMessage } = await import("../lib/draft");
+    const { saveProfile } = await import("../lib/repo");
+    const { db, pid } = setup();
+    let seen = "";
+    const fake = (async (req: { user: string }) => {
+      seen = req.user;
+      return { subject: " Hello ", body: " Hi Ada, quick note. " };
+    }) as never;
+    await expect(draftMessage(db, fake, pid, "outreach")).rejects.toThrow(/Offer/);
+    saveProfile(db, { offer: "SEO retainers", icp: "B2B SaaS" });
+    const id = await draftMessage(db, fake, pid, "outreach");
+    expect(seen).toContain("SEO retainers");
+    expect(seen).toContain("Analytical Co");
+    const pending = listPendingApprovals(db);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ id, subject: "Hello", body: "Hi Ada, quick note.", kind: "outreach" });
+  });
+});
