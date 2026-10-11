@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { DB } from "./db";
-import { createProspect, getProfile } from "./repo";
+import { cleanLinkedinUrl, createProspect, getProfile } from "./repo";
 import { fetchPageText, normalizeUrl } from "./safeFetch";
 
 /** Runs a web-search-backed LLM call and returns its text plus the domains it cited. */
@@ -15,6 +15,7 @@ const CandidatesSchema = z.object({
       email: z.string().default(""),
       notes: z.string().default(""),
       source_url: z.string().default(""),
+      linkedin_url: z.string().default(""),
     }),
   ),
 });
@@ -28,8 +29,9 @@ Rules:
 - "email" only if it is shown publicly on a page you found; otherwise an empty string.
 - "name" is a named contact if a source shows one, otherwise use the company name.
 - "source_url": the exact page from the search results where you found this lead or contact. Required.
+- "linkedin_url": the person's or company's LinkedIn page ONLY if it appears in the search results; otherwise an empty string. Never construct a LinkedIn URL.
 - "notes": one or two factual sentences from the sources on why they fit (what they do, a recent change). No guesses.
-- Reply with ONLY a JSON object: {"leads":[{"name":"","company":"","website":"","email":"","notes":"","source_url":""}]}. No prose, no code fences.`;
+- Reply with ONLY a JSON object: {"leads":[{"name":"","company":"","website":"","email":"","notes":"","source_url":"","linkedin_url":""}]}. No prose, no code fences.`;
 
 const hostOf = (url: string): string | null => {
   const u = normalizeUrl(url);
@@ -140,6 +142,7 @@ export async function sourceLeads(
       website: normalizeUrl(c.website)!.origin,
       notes: c.notes.trim().slice(0, 2000),
       source_url: normalizeUrl(c.source_url)?.href.slice(0, 500) ?? "",
+      linkedin_url: cleanLinkedinUrl(c.linkedin_url),
       source: `AI search${(opts.label ?? focus) ? `: ${opts.label ?? focus}` : ""}`.slice(0, 200),
     });
     seenHosts.add(host);

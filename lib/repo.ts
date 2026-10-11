@@ -17,15 +17,16 @@ export function createProspect(
     notes?: string;
     source?: string;
     source_url?: string;
+    linkedin_url?: string;
   },
 ): number {
   const t = now();
   const r = db
     .prepare(
-      `INSERT INTO prospects (name, company, email, website, notes, source, source_url, created_at, updated_at)
-       VALUES (@name, @company, @email, @website, @notes, @source, @source_url, @t, @t)`,
+      `INSERT INTO prospects (name, company, email, website, notes, source, source_url, linkedin_url, created_at, updated_at)
+       VALUES (@name, @company, @email, @website, @notes, @source, @source_url, @linkedin_url, @t, @t)`,
     )
-    .run({ company: "", email: "", website: "", notes: "", source: "", source_url: "", ...input, t });
+    .run({ company: "", email: "", website: "", notes: "", source: "", source_url: "", linkedin_url: "", ...input, t });
   return Number(r.lastInsertRowid);
 }
 
@@ -173,6 +174,55 @@ export function decideDraft(
     }
     return true;
   })();
+}
+
+export const isEmail = (s: string) => /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(s.trim());
+
+/** Only keep real LinkedIn profile or company pages. */
+export function cleanLinkedinUrl(input: string): string {
+  const raw = input.trim();
+  if (!raw) return "";
+  try {
+    const u = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    const host = u.hostname.toLowerCase().replace(/^www\./, "");
+    if ((host === "linkedin.com" || host.endsWith(".linkedin.com")) && /^\/(in|company)\/[^/]+/i.test(u.pathname)) {
+      return `https://www.linkedin.com${u.pathname.replace(/\/+$/, "")}`.slice(0, 300);
+    }
+  } catch {
+    /* not a URL */
+  }
+  return "";
+}
+
+/** Let the user fix up how to reach a lead. Blank clears a field; invalid values are rejected. */
+export function updateContact(db: DB, id: number, input: { email: string; linkedin_url: string }): void {
+  const email = input.email.trim().toLowerCase();
+  if (email && !isEmail(email)) throw new Error("That email address doesn't look valid.");
+  const linkedin = cleanLinkedinUrl(input.linkedin_url);
+  if (input.linkedin_url.trim() && !linkedin) throw new Error("Use a linkedin.com/in/... or linkedin.com/company/... link.");
+  db.prepare(`UPDATE prospects SET email = ?, linkedin_url = ?, updated_at = ? WHERE id = ?`).run(email, linkedin, now(), id);
+}
+
+export interface ReadyMessage extends Message {
+  prospect_name: string;
+  company: string;
+  email: string;
+}
+
+/** Approved messages the user still has to send (they send from their own mail app). */
+export function listReadyToSend(db: DB): ReadyMessage[] {
+  return db
+    .prepare(
+      `SELECT m.*, p.name AS prospect_name, p.company AS company, p.email AS email
+       FROM messages m JOIN prospects p ON p.id = m.prospect_id
+       WHERE m.status = 'approved' AND m.direction = 'outbound' ORDER BY m.decided_at, m.id`,
+    )
+    .all() as ReadyMessage[];
+}
+
+/** The user sent an approved message themselves. Returns false if it wasn't awaiting sending. */
+export function markSent(db: DB, id: number): boolean {
+  return db.prepare(`UPDATE messages SET status = 'sent', sent_at = ?, send_error = '' WHERE id = ? AND status = 'approved'`).run(now(), id).changes > 0;
 }
 
 /** Record an inbound reply: stops the follow-up clock and marks the prospect as replied. */

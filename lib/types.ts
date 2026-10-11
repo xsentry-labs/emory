@@ -14,6 +14,7 @@ export interface Prospect {
   status: ProspectStatus;
   source: string;
   source_url: string;
+  linkedin_url: string;
   icp_fit: number | null;
   bant_budget: number | null;
   bant_authority: number | null;

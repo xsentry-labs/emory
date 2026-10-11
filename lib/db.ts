@@ -73,6 +73,9 @@ const MIGRATIONS: string[] = [
   `
   ALTER TABLE prospects ADD COLUMN source_url TEXT NOT NULL DEFAULT '';
   `,
+  `
+  ALTER TABLE prospects ADD COLUMN linkedin_url TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 export function migrate(db: DB): void {

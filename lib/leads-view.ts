@@ -9,6 +9,7 @@ export interface LeadView {
   company: string;
   website: string;
   sourceUrl: string;
+  linkedinUrl: string;
   email: string;
   status: string;
   score: number | null;
@@ -32,6 +33,7 @@ export function leadsPayload(db: DB): LeadsPayload {
     company: r.company,
     website: r.website,
     sourceUrl: r.source_url,
+    linkedinUrl: r.linkedin_url,
     email: r.email,
     status: r.status,
     score: r.score,

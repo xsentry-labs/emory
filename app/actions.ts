@@ -8,6 +8,8 @@ import {
   createDraft,
   createProspect,
   decideDraft,
+  markSent,
+  updateContact,
   logReply,
   saveProfile,
   saveQualification,
@@ -225,4 +227,28 @@ export async function runPlay(formData: FormData) {
     error = err instanceof Error ? err.message : "Could not start the play.";
   }
   redirect(error ? `/plays?error=${encodeURIComponent(error)}` : "/leads");
+}
+
+/** The user sent this approved message from their own mail app. */
+export async function markMessageSent(formData: FormData) {
+  const input = z.object({ id }).parse(Object.fromEntries(formData));
+  markSent(getDb(), input.id);
+  revalidatePath("/approvals");
+  revalidatePath("/prospects", "layout");
+  revalidatePath("/leads");
+}
+
+export async function saveContact(formData: FormData) {
+  const input = z
+    .object({ prospectId: id, email: text(320), linkedin_url: text(300) })
+    .parse(Object.fromEntries(formData));
+  let error = "";
+  try {
+    updateContact(getDb(), input.prospectId, input);
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Could not save.";
+  }
+  revalidatePath("/prospects", "layout");
+  revalidatePath("/leads");
+  if (error) redirect(`/prospects/${input.prospectId}?error=${encodeURIComponent(error)}`);
 }
