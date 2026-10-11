@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { DB } from "./db";
 import { createProspect, getProfile } from "./repo";
-import { normalizeUrl } from "./safeFetch";
+import { fetchPageText, normalizeUrl } from "./safeFetch";
 
 /** Runs a web-search-backed LLM call and returns its text plus the domains it cited. */
 export type Searcher = (req: { system: string; user: string }) => Promise<{ text: string; citedDomains: string[] }>;
@@ -45,6 +45,16 @@ export function parseCandidates(text: string): z.infer<typeof CandidatesSchema> 
   return CandidatesSchema.parse(JSON.parse(text.slice(start, end + 1)));
 }
 
+/** True if the site resolves to a public address and answers. Used to confirm a lead is a real company. */
+export async function siteIsReachable(url: string): Promise<boolean> {
+  try {
+    await fetchPageText(url, 20_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface SourcingResult {
   added: number;
   skipped: { duplicate: number; unverified: number };
@@ -52,14 +62,15 @@ export interface SourcingResult {
 
 /**
  * Find new leads matching the saved ICP and add them. A candidate is kept only
- * if its website is one of the pages the search actually cited, which blocks
- * invented companies; leads already in the database (same site or email) are
- * skipped. New leads are unscored: run research to score them.
+ * if its website was cited by the search or is a real, reachable site (which
+ * blocks invented companies even when the model returns no citations); leads
+ * already in the database (same site or email) are skipped. New leads are
+ * unscored: run research to score them.
  */
 export async function sourceLeads(
   db: DB,
   search: Searcher,
-  opts: { count?: number; focus?: string } = {},
+  opts: { count?: number; focus?: string; isReachable?: (url: string) => Promise<boolean> } = {},
 ): Promise<SourcingResult> {
   const profile = getProfile(db);
   if (!profile.offer.trim() || !profile.icp.trim()) {
@@ -99,9 +110,19 @@ export async function sourceLeads(
   const seenEmails = new Set(known.map((k) => k.email.trim().toLowerCase()).filter(Boolean));
 
   const result: SourcingResult = { added: 0, skipped: { duplicate: 0, unverified: 0 } };
-  for (const c of candidates.leads.slice(0, count)) {
+  const isReachable = opts.isReachable ?? siteIsReachable;
+  const picked = candidates.leads.slice(0, count);
+  // Cited sites are trusted; anything else must be a live site.
+  const verified = await Promise.all(
+    picked.map(async (c) => {
+      const host = hostOf(c.website);
+      if (!host) return false;
+      return isCited(host, cited) || (await isReachable(normalizeUrl(c.website)!.href));
+    }),
+  );
+  for (const [i, c] of picked.entries()) {
     const host = hostOf(c.website);
-    if (!host || !isCited(host, cited)) {
+    if (!host || !verified[i]) {
       result.skipped.unverified++;
       continue;
     }

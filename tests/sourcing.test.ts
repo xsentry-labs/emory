@@ -51,11 +51,23 @@ describe("sourceLeads", () => {
         "www.compilers.io",
         "b.io",
       ]),
+      { isReachable: async () => false },
     );
     expect(r).toEqual({ added: 2, skipped: { duplicate: 0, unverified: 1 } });
     const rows = listProspects(db);
     expect(rows.map((p) => p.company).sort()).toEqual(["B", "Compilers Inc"]);
     expect(rows.find((p) => p.company === "B")!.email).toBe("");
+  });
+
+  it("accepts uncited leads whose site is reachable (search returned no citations)", async () => {
+    const db = setup();
+    const live = ["compilers.io", "z.io"];
+    const r = await sourceLeads(
+      db,
+      reply([lead(), lead({ company: "Z", website: "z.io" }), lead({ company: "Ghost", website: "ghost.example" })], []),
+      { isReachable: async (u) => live.some((h) => new URL(u).hostname.endsWith(h)) },
+    );
+    expect(r).toEqual({ added: 2, skipped: { duplicate: 0, unverified: 1 } });
   });
 
   it("skips leads already in the database by site or email", async () => {

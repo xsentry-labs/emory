@@ -15,6 +15,7 @@ function breakdown(r: NonNullable<LeadView["ratings"]>) {
 }
 
 function Progress({ p }: { p: LeadsPayload["pipeline"] }) {
+  const elapsed = useElapsed(p.startedAt, p.status === "running");
   if (p.status === "running") {
     const label =
       p.phase === "finding"
@@ -23,7 +24,12 @@ function Progress({ p }: { p: LeadsPayload["pipeline"] }) {
     const pct = p.phase === "enriching" && p.total > 0 ? Math.round((p.done / p.total) * 100) : 8;
     return (
       <div className="mb-5">
-        <p className="mb-2 text-sm">{label}</p>
+        <p className="mb-2 text-sm">
+          {label} <span className="tnum text-mute">{elapsed}s</span>
+        </p>
+        {p.phase === "finding" && elapsed > 45 ? (
+          <p className="mb-2 text-caption text-mute">Web search can take a minute or two. It will stop with an error after 3 minutes.</p>
+        ) : null}
         <div className="h-1.5 overflow-hidden rounded bg-wash" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full bg-ink transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
@@ -41,6 +47,16 @@ function Progress({ p }: { p: LeadsPayload["pipeline"] }) {
     return <p className="mb-5 text-sm text-mute">Finished, with some issues: {p.error}</p>;
   }
   return null;
+}
+
+function useElapsed(since: number, active: boolean) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [active]);
+  return active && since ? Math.max(0, Math.round((now - since) / 1000)) : 0;
 }
 
 export function LeadsTable({ initial }: { initial: LeadsPayload }) {

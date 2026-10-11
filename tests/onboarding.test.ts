@@ -113,6 +113,21 @@ describe("pipeline", () => {
     expect(view.leads[0].ratings).toEqual({ icpFit: 3, need: 3, budget: 2, authority: 2, timing: 1 });
   });
 
+  it("fails with a clear reason when no lead could be verified", async () => {
+    const db = openDb(":memory:");
+    await runOnboarding(db, fakeLlm, { website: "", description: "We do SEO.", docs: [] });
+    const uncited: Searcher = async () => ({
+      text: JSON.stringify({ leads: [{ name: "P", company: "C", website: "ghost.example", email: "", notes: "" }] }),
+      citedDomains: [],
+    });
+    // Default reachability check would hit the network, so stub it via the sourcing option.
+    const { sourceLeads } = await import("../lib/sourcing");
+    await expect(sourceLeads(db, uncited, { isReachable: async () => false })).resolves.toMatchObject({
+      added: 0,
+      skipped: { unverified: 1 },
+    });
+  });
+
   it("keeps going when one lead fails, and reports the problem", async () => {
     const db = openDb(":memory:");
     await runOnboarding(db, fakeLlm, { website: "", description: "We do SEO.", docs: [] });
