@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { getDb } from "@/lib/request-db";
+import { currentUser, getDb } from "@/lib/request-db";
 import {
   createDraft,
   createProspect,
@@ -19,6 +19,11 @@ import { PROSPECT_STATUSES } from "@/lib/types";
 import { draftMessage } from "@/lib/draft";
 import { researchLead } from "@/lib/research";
 import { readUploads, countWords, MAX_DESCRIPTION_WORDS } from "@/lib/documents";
+import { isAdminEmail } from "@/lib/admin";
+import { getAccount, getAccountsDb, listWorkspaceIds } from "@/lib/accounts";
+import { getWorkspaceDb } from "@/lib/db";
+import { isPlanId } from "@/lib/pricing";
+import { charge, setPlan } from "@/lib/quota";
 import { consume } from "@/lib/usage";
 import { runOnboarding } from "@/lib/onboarding";
 import { getPipeline, startPipeline } from "@/lib/pipeline";
@@ -111,6 +116,7 @@ export async function generateDraft(formData: FormData) {
   try {
     if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
     consume(getDb(), "ai");
+    charge(getDb(), "ai");
     await draftMessage(getDb(), openRouterLlm, input.prospectId, input.kind);
   } catch (err) {
     error = err instanceof Error ? err.message : "Drafting failed.";
@@ -126,6 +132,7 @@ export async function research(formData: FormData) {
   try {
     if (!isLlmConfigured()) throw new Error("OPENROUTER_API_KEY is not set.");
     consume(getDb(), "ai");
+    charge(getDb(), "ai");
     await researchLead(getDb(), openRouterLlm, input.prospectId);
   } catch (err) {
     error = err instanceof Error ? err.message : "Research failed.";
@@ -267,4 +274,15 @@ export async function runSeoAudit(formData: FormData) {
     error = err instanceof Error ? err.message : "Could not start the audit.";
   }
   redirect(error ? `/seo?error=${encodeURIComponent(error)}` : "/seo");
+}
+
+/** Admin only: move a workspace to a plan. */
+export async function setWorkspacePlan(formData: FormData) {
+  const input = z.object({ workspaceId: id, plan: z.string() }).parse(Object.fromEntries(formData));
+  const user = currentUser();
+  const email = user ? getAccount(getAccountsDb(), user.userId)?.email : undefined;
+  if (!isAdminEmail(email)) throw new Error("Not allowed");
+  if (!isPlanId(input.plan) || !listWorkspaceIds(getAccountsDb()).includes(input.workspaceId)) throw new Error("Invalid plan or workspace");
+  setPlan(getWorkspaceDb(input.workspaceId), input.plan);
+  revalidatePath("/admin");
 }

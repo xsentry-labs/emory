@@ -8,6 +8,7 @@ import {
   MessagesSquare,
   PenLine,
   Search,
+  ShieldCheck,
   Sparkles,
   Users,
   type LucideIcon,
@@ -31,6 +32,8 @@ interface Item {
 export interface SidebarProps {
   email: string;
   pending: number;
+  plan: string;
+  isAdmin?: boolean;
   usage: { label: string; used: number; limit: number }[];
 }
 
@@ -82,11 +85,12 @@ function NavItem({ item, active }: { item: Item; active: boolean }) {
   );
 }
 
-export function Sidebar({ email, pending, usage }: SidebarProps) {
+export function Sidebar({ email, pending, plan, isAdmin, usage }: SidebarProps) {
   const pathname = usePathname();
   const isActive = (href?: string) => Boolean(href) && (pathname === href || pathname.startsWith(`${href}/`));
   const groups = sections(pending);
   const business: Item = { href: "/profile", label: "Your business", icon: Building2 };
+  const admin: Item = { href: "/admin", label: "Admin", icon: ShieldCheck };
 
   return (
     <>
@@ -109,18 +113,24 @@ export function Sidebar({ email, pending, usage }: SidebarProps) {
           <div>
             <p className="label mb-1.5 px-2.5 uppercase tracking-wide">Account</p>
             <NavItem item={business} active={isActive(business.href)} />
+            {isAdmin ? <NavItem item={admin} active={isActive(admin.href)} /> : null}
           </div>
         </nav>
         <div className="space-y-3 border-t border-line px-4 py-4">
           <div>
-            <p className="label mb-1.5">Today&apos;s usage</p>
+            <div className="mb-1.5 flex items-center justify-between">
+              <p className="label">This month</p>
+              <Link href="/pricing" className="text-caption underline">
+                {plan} plan
+              </Link>
+            </div>
             <ul className="space-y-1.5">
               {usage.map((u) => (
                 <li key={u.label}>
                   <div className="flex justify-between text-caption">
                     <span className="text-mute">{u.label}</span>
                     <span className="tnum">
-                      {u.used}/{u.limit}
+                      {u.used.toLocaleString("en-US")}/{u.limit.toLocaleString("en-US")}
                     </span>
                   </div>
                   <div className="mt-1 h-1 overflow-hidden rounded bg-line">
@@ -154,7 +164,7 @@ export function Sidebar({ email, pending, usage }: SidebarProps) {
           </form>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-3 pb-2">
-          {[...groups.flatMap((g) => g.items), business].map((item) => (
+          {[...groups.flatMap((g) => g.items), business, ...(isAdmin ? [admin] : [])].map((item) => (
             <div key={item.label} className="shrink-0">
               <NavItem item={item} active={isActive(item.href)} />
             </div>

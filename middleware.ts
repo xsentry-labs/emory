@@ -7,6 +7,8 @@ const WORKSPACE_HEADER = "x-emory-workspace";
 const USER_HEADER = "x-emory-user";
 
 const PUBLIC_PAGES = new Set(["/login", "/signup"]);
+// The marketing site: anyone can view it; signed-in visitors get their identity attached.
+const MARKETING_PAGES = new Set(["/", "/pricing"]);
 
 export async function middleware(req: NextRequest) {
   const secret = sessionSecret();
@@ -20,6 +22,14 @@ export async function middleware(req: NextRequest) {
   const headers = new Headers(req.headers);
   headers.delete(WORKSPACE_HEADER);
   headers.delete(USER_HEADER);
+
+  if (MARKETING_PAGES.has(pathname)) {
+    if (claims) {
+      headers.set(WORKSPACE_HEADER, String(claims.workspaceId));
+      headers.set(USER_HEADER, String(claims.userId));
+    }
+    return NextResponse.next({ request: { headers } });
+  }
 
   if (PUBLIC_PAGES.has(pathname)) {
     // Already signed in: go to the app instead of showing the form again.

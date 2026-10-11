@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { DB } from "./db";
+import { allowance, recordUsage } from "./quota";
 import { cleanLinkedinUrl, createProspect, getProfile } from "./repo";
 import { fetchPageText, normalizeUrl } from "./safeFetch";
 
@@ -80,7 +81,8 @@ export async function sourceLeads(
   if (!profile.offer.trim() || !profile.icp.trim()) {
     throw new Error("Fill in your offer and ideal customer on the Offer & ICP page first.");
   }
-  const count = Math.min(Math.max(Math.floor(opts.count ?? 5), 1), 10);
+  // The plan may allow fewer leads than asked for; throws a clear error when none are left.
+  const count = allowance(db, "leads", Math.min(Math.max(Math.floor(opts.count ?? 5), 1), 10));
   const focus = (opts.focus ?? "").trim().slice(0, 300);
 
   const user = [
@@ -149,5 +151,6 @@ export async function sourceLeads(
     if (email) seenEmails.add(email);
     result.added++;
   }
+  recordUsage(db, "leads", result.added);
   return result;
 }
