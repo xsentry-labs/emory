@@ -37,7 +37,7 @@ export default function StartPage({
   const ready = isLlmConfigured();
 
   return (
-    <div className="mx-auto max-w-2xl pt-6">
+    <div className="mx-auto max-w-2xl px-4 py-10">
       <Steps current={step} />
       {!ready ? (
         <p className="mb-6 rounded-md border border-line bg-wash px-4 py-3 text-sm">

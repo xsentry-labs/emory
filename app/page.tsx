@@ -5,5 +5,5 @@ import { getBusiness } from "@/lib/repo";
 export const dynamic = "force-dynamic";
 
 export default function Home() {
-  redirect(getBusiness(getDb()).onboardedAt ? "/leads" : "/start");
+  redirect(getBusiness(getDb()).onboardedAt ? "/plays" : "/start");
 }

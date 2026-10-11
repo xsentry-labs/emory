@@ -55,7 +55,11 @@ const save = (db: DB, patch: Partial<PipelineState>) =>
  * outreach (queued for approval). Runs in the background; progress is read
  * with getPipeline. Returns false if a run is already in progress.
  */
-export function startPipeline(db: DB, deps: PipelineDeps, opts: { count?: number; focus?: string } = {}): boolean {
+export function startPipeline(
+  db: DB,
+  deps: PipelineDeps,
+  opts: { count?: number; focus?: string; label?: string } = {},
+): boolean {
   if (running().has(db)) return false;
   running().add(db);
   setKv(db, KEY, JSON.stringify({ ...IDLE, status: "running", phase: "finding", startedAt: Date.now() }));
@@ -73,9 +77,13 @@ export function startPipeline(db: DB, deps: PipelineDeps, opts: { count?: number
 const message = (err: unknown) => (err instanceof Error ? err.message : "Something went wrong.").slice(0, 300);
 
 /** Exposed for tests: awaits the whole run instead of fire-and-forget. */
-export async function run(db: DB, deps: PipelineDeps, opts: { count?: number; focus?: string }): Promise<void> {
+export async function run(
+  db: DB,
+  deps: PipelineDeps,
+  opts: { count?: number; focus?: string; label?: string },
+): Promise<void> {
   console.log("[pipeline] finding leads");
-  const found = await sourceLeads(db, deps.search, { count: opts.count ?? 10, focus: opts.focus });
+  const found = await sourceLeads(db, deps.search, { count: opts.count ?? 10, focus: opts.focus, label: opts.label });
   console.log(`[pipeline] added ${found.added}, skipped ${JSON.stringify(found.skipped)}`);
   if (found.added === 0) {
     const { duplicate, unverified } = found.skipped;

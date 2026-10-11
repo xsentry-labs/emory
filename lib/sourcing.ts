@@ -72,7 +72,7 @@ export interface SourcingResult {
 export async function sourceLeads(
   db: DB,
   search: Searcher,
-  opts: { count?: number; focus?: string; isReachable?: (url: string) => Promise<boolean> } = {},
+  opts: { count?: number; focus?: string; label?: string; isReachable?: (url: string) => Promise<boolean> } = {},
 ): Promise<SourcingResult> {
   const profile = getProfile(db);
   if (!profile.offer.trim() || !profile.icp.trim()) {
@@ -140,7 +140,7 @@ export async function sourceLeads(
       website: normalizeUrl(c.website)!.origin,
       notes: c.notes.trim().slice(0, 2000),
       source_url: normalizeUrl(c.source_url)?.href.slice(0, 500) ?? "",
-      source: `AI search${focus ? `: ${focus}` : ""}`.slice(0, 200),
+      source: `AI search${(opts.label ?? focus) ? `: ${opts.label ?? focus}` : ""}`.slice(0, 200),
     });
     seenHosts.add(host);
     if (email) seenEmails.add(email);

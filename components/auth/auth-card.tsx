@@ -14,7 +14,7 @@ export function AuthCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-sm flex-col justify-center">
+    <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
       <Link href="/" className="mb-8 font-display text-h2 font-medium">
         Emory
       </Link>
