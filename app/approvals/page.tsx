@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { listPendingApprovals } from "@/lib/repo";
 
 export const dynamic = "force-dynamic";

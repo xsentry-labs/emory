@@ -29,7 +29,9 @@ const CONCURRENCY = 3;
 const MAX_ENRICH = 25;
 const IDLE: PipelineState = { status: "idle", phase: "", total: 0, done: 0, added: 0, error: "", startedAt: 0, finishedAt: null };
 
-const g = globalThis as unknown as { __emoryPipeline?: boolean };
+// Databases (workspaces) with a run in flight. One run per workspace at a time.
+const g = globalThis as unknown as { __emoryRunning?: WeakSet<DB> };
+const running = (): WeakSet<DB> => (g.__emoryRunning ??= new WeakSet());
 
 const rawState = (db: DB): PipelineState => {
   const raw = getKv(db, KEY);
@@ -39,7 +41,7 @@ const rawState = (db: DB): PipelineState => {
 export function getPipeline(db: DB): PipelineState {
   const state = rawState(db);
   // A "running" state with no live run means the server restarted mid-run.
-  if (state.status === "running" && !g.__emoryPipeline) {
+  if (state.status === "running" && !running().has(db)) {
     return { ...state, status: "error", error: "Interrupted by a restart. Run it again.", finishedAt: state.startedAt };
   }
   return state;
@@ -54,8 +56,8 @@ const save = (db: DB, patch: Partial<PipelineState>) =>
  * with getPipeline. Returns false if a run is already in progress.
  */
 export function startPipeline(db: DB, deps: PipelineDeps, opts: { count?: number; focus?: string } = {}): boolean {
-  if (g.__emoryPipeline) return false;
-  g.__emoryPipeline = true;
+  if (running().has(db)) return false;
+  running().add(db);
   setKv(db, KEY, JSON.stringify({ ...IDLE, status: "running", phase: "finding", startedAt: Date.now() }));
   void run(db, deps, opts)
     .catch((err) => {
@@ -63,7 +65,7 @@ export function startPipeline(db: DB, deps: PipelineDeps, opts: { count?: number
       save(db, { status: "error", phase: "", error: message(err), finishedAt: Date.now() });
     })
     .finally(() => {
-      g.__emoryPipeline = false;
+      running().delete(db);
     });
   return true;
 }

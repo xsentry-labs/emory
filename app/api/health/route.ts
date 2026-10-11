@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getAccountsDb } from "@/lib/accounts";
 
 export const dynamic = "force-dynamic";
 
 export function GET() {
   try {
-    getDb().prepare("SELECT 1").get();
+    getAccountsDb().prepare("SELECT 1").get();
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ ok: false }, { status: 503 });

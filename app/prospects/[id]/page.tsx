@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { isLlmConfigured } from "@/lib/llm";
 import { sendConfig } from "@/lib/mailer";
 import { getProspect, listMessages } from "@/lib/repo";
@@ -74,6 +74,13 @@ export default function ProspectPage({
       />
 
       {prospect.notes ? <p className="measure mb-8 whitespace-pre-wrap text-mute">{prospect.notes}</p> : null}
+      {prospect.source_url ? (
+        <p className="mb-8 text-sm">
+          <a href={prospect.source_url} target="_blank" rel="noopener noreferrer" className="underline">
+            Where this lead was found
+          </a>
+        </p>
+      ) : null}
 
       <form action={research} className="card mb-6 flex flex-wrap items-center gap-3 p-5">
         <input type="hidden" name="prospectId" value={prospect.id} />

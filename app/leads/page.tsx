@@ -4,7 +4,7 @@ import { LeadsTable } from "@/components/leads/leads-table";
 import { PageHead } from "@/components/page-head";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { leadsPayload } from "@/lib/leads-view";
 import { isLlmConfigured } from "@/lib/llm";
 import { getBusiness, getProfile } from "@/lib/repo";
@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-export default function LeadsPage() {
+export default function LeadsPage({ searchParams }: { searchParams: { error?: string } }) {
   const db = getDb();
   if (!getBusiness(db).onboardedAt) redirect("/start");
   const payload = leadsPayload(db);
@@ -30,6 +30,12 @@ export default function LeadsPage() {
           </Link>
         }
       />
+
+      {searchParams.error ? (
+        <p role="alert" className="mb-4 rounded-md border border-danger/30 px-4 py-3 text-sm text-danger">
+          {searchParams.error}
+        </p>
+      ) : null}
 
       <div className="card mb-6 flex flex-wrap items-end justify-between gap-4 p-4">
         <div className="min-w-60 flex-1">

@@ -9,6 +9,7 @@ const lead = (over: object = {}) => ({
   website: "https://www.compilers.io/about",
   email: "",
   notes: "Builds compilers.",
+  source_url: "https://news.example.com/compilers-raise",
   ...over,
 });
 const reply = (leads: object[], cited: string[]): Searcher => async () => ({
@@ -40,6 +41,7 @@ describe("sourceLeads", () => {
       status: "new",
       score: null,
       source: "AI search: dev tools",
+      source_url: "https://news.example.com/compilers-raise",
     });
   });
 

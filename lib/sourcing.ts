@@ -14,6 +14,7 @@ const CandidatesSchema = z.object({
       website: z.string(),
       email: z.string().default(""),
       notes: z.string().default(""),
+      source_url: z.string().default(""),
     }),
   ),
 });
@@ -26,8 +27,9 @@ Rules:
 - "website" must be the company's own site, taken from the search results.
 - "email" only if it is shown publicly on a page you found; otherwise an empty string.
 - "name" is a named contact if a source shows one, otherwise use the company name.
+- "source_url": the exact page from the search results where you found this lead or contact. Required.
 - "notes": one or two factual sentences from the sources on why they fit (what they do, a recent change). No guesses.
-- Reply with ONLY a JSON object: {"leads":[{"name":"","company":"","website":"","email":"","notes":""}]}. No prose, no code fences.`;
+- Reply with ONLY a JSON object: {"leads":[{"name":"","company":"","website":"","email":"","notes":"","source_url":""}]}. No prose, no code fences.`;
 
 const hostOf = (url: string): string | null => {
   const u = normalizeUrl(url);
@@ -137,6 +139,7 @@ export async function sourceLeads(
       email,
       website: normalizeUrl(c.website)!.origin,
       notes: c.notes.trim().slice(0, 2000),
+      source_url: normalizeUrl(c.source_url)?.href.slice(0, 500) ?? "",
       source: `AI search${focus ? `: ${focus}` : ""}`.slice(0, 200),
     });
     seenHosts.add(host);

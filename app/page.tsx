@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { getBusiness } from "@/lib/repo";
 
 export const dynamic = "force-dynamic";

@@ -70,6 +70,9 @@ const MIGRATIONS: string[] = [
   ALTER TABLE profile ADD COLUMN context TEXT NOT NULL DEFAULT '';
   ALTER TABLE profile ADD COLUMN onboarded_at INTEGER;
   `,
+  `
+  ALTER TABLE prospects ADD COLUMN source_url TEXT NOT NULL DEFAULT '';
+  `,
 ];
 
 export function migrate(db: DB): void {
@@ -92,10 +95,19 @@ export function openDb(file: string): DB {
   return db;
 }
 
-const g = globalThis as unknown as { __emoryDb?: DB };
+const g = globalThis as unknown as { __emoryWorkspaceDbs?: Map<number, DB> };
 
-/** Process-wide singleton (survives Next dev hot reloads). */
-export function getDb(): DB {
-  if (!g.__emoryDb) g.__emoryDb = openDb(path.join(dataDir(), "emory.db"));
-  return g.__emoryDb;
+/**
+ * One SQLite file per workspace (customer): isolation by construction, so no
+ * query can ever read another customer's rows. Handles are cached per process.
+ */
+export function getWorkspaceDb(workspaceId: number): DB {
+  if (!Number.isInteger(workspaceId) || workspaceId < 1) throw new Error("Invalid workspace");
+  const cache = (g.__emoryWorkspaceDbs ??= new Map());
+  let db = cache.get(workspaceId);
+  if (!db) {
+    db = openDb(path.join(dataDir(), "workspaces", `${workspaceId}.db`));
+    cache.set(workspaceId, db);
+  }
+  return db;
 }

@@ -3,7 +3,7 @@ import { PageHead } from "@/components/page-head";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/db";
+import { getDb } from "@/lib/request-db";
 import { getProfile } from "@/lib/repo";
 
 export const dynamic = "force-dynamic";
