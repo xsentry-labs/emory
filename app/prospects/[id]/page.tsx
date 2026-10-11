@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { getDb } from "@/lib/db";
 import { isLlmConfigured } from "@/lib/llm";
+import { sendConfig } from "@/lib/mailer";
 import { getProspect, listMessages } from "@/lib/repo";
 import { PROSPECT_STATUSES } from "@/lib/types";
 import { RATING_LABELS, WEIGHTS, scoreLead } from "@/lib/qualify";
@@ -35,6 +36,7 @@ export default function ProspectPage({
   const prospect = getProspect(db, id);
   if (!prospect) notFound();
   const messages = listMessages(db, id);
+  const sendingEnabled = sendConfig() !== null;
   const nextKind = messages.some((m) => m.direction === "outbound") ? "followup" : "outreach";
   const current = {
     icpFit: prospect.icp_fit ?? 0,
@@ -147,6 +149,14 @@ export default function ProspectPage({
               </div>
               {m.subject ? <p className="font-medium">{m.subject}</p> : null}
               <p className="whitespace-pre-wrap">{m.body}</p>
+              {m.status === "approved" ? (
+                <p className={`mt-2 text-caption ${m.send_error ? "text-danger" : "text-mute"}`}>
+                  {m.send_error || (sendingEnabled ? "Approved. Sends on the next worker run." : "Approved. Sending is not configured (set SMTP_URL and FROM_EMAIL).")}
+                </p>
+              ) : null}
+              {m.status === "sent" && m.sent_at ? (
+                <p className="tnum mt-2 text-caption text-mute">Sent {new Date(m.sent_at).toLocaleString()}</p>
+              ) : null}
             </li>
           ))}
         </ul>

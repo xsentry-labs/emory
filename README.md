@@ -13,6 +13,7 @@ One deployable unit: a single Railway container with a volume.
 - **Worker** runs in-process, started from `instrumentation.ts`. It queues follow-up *drafts* when due; it never sends.
 - **Qualification**: ICP fit plus BANT, each rated 0-3 and combined into a 0-100 score and A/B/C tier (`lib/qualify.ts`). Leads are ranked by score. What you sell and who it is for lives in the `profile` table (Offer & ICP page).
 - **LLM**: calls go through OpenRouter (`lib/llm.ts`, default model `openai/gpt-6-luna`, override with `OPENROUTER_MODEL`). AI drafting (`lib/draft.ts`) writes into the Approvals queue; it needs `OPENROUTER_API_KEY`.
+- **Sending**: the worker emails approved messages over SMTP (`lib/send.ts`, `lib/mailer.ts`). Off unless `SMTP_URL` and `FROM_EMAIL` are set. It only sends what a human approved, caps volume (`SEND_DAILY_CAP`, rolling 24h), retries a failure up to 3 times, threads follow-ups onto earlier emails, skips leads without a valid address, and never sends a follow-up after the lead replied. Set `EMAIL_FOOTER` to add your postal address and an opt-out line to every email.
 - **Auth**: one shared `ADMIN_PASSWORD` over HTTP Basic Auth (`middleware.ts`). `/api/health` is open.
 
 The SQLite file lives on the volume, so run exactly **one replica** (set in `railway.json`).
@@ -21,7 +22,6 @@ The SQLite file lives on the volume, so run exactly **one replica** (set in `rai
 
 - Lead sourcing (leads are added by hand; the `source` field records where they came from).
 - Automated research and scoring (qualification is rated by hand today; the 0-100 score and ranking are computed).
-- Sending approved messages (approved messages are marked `approved`, nothing leaves the system).
 - Automated prospect research.
 - Inbound reply capture (replies are logged by hand).
 
