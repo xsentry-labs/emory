@@ -20,7 +20,8 @@ async function startSession(account: Account) {
 
 const clientKey = () => headers().get("x-forwarded-for")?.split(",")[0].trim() || "local";
 const field = (fd: FormData, name: string) => String(fd.get(name) ?? "");
-const back = (page: string, error: string): never => redirect(`${page}?error=${encodeURIComponent(error)}`);
+const back = (page: string, error: string, website = ""): never =>
+  redirect(`${page}?error=${encodeURIComponent(error)}${website ? `&website=${encodeURIComponent(website)}` : ""}`);
 
 export async function login(formData: FormData) {
   const email = field(formData, "email");
@@ -34,10 +35,11 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
-  if (!allow(`signup:${clientKey()}`, 10, 60 * 60_000)) back("/signup", "Too many attempts. Try again later.");
+  const website = field(formData, "website").trim().slice(0, 300);
+  if (!allow(`signup:${clientKey()}`, 10, 60 * 60_000)) back("/signup", "Too many attempts. Try again later.", website);
   const invite = process.env.INVITE_CODE;
-  if (!invite) back("/signup", "Sign-ups are closed. Ask the owner to set an invite code.");
-  if (!inviteCodeMatches(field(formData, "invite"), invite)) back("/signup", "That invite code is not valid.");
+  if (!invite) back("/signup", "Sign-ups are closed. Ask the owner to set an invite code.", website);
+  if (!inviteCodeMatches(field(formData, "invite"), invite)) back("/signup", "That invite code is not valid.", website);
   let account: Account;
   try {
     account = createAccount(getAccountsDb(), {
@@ -46,10 +48,10 @@ export async function signup(formData: FormData) {
       workspaceName: field(formData, "company"),
     });
   } catch (err) {
-    return back("/signup", err instanceof Error ? err.message : "Could not create the account.");
+    return back("/signup", err instanceof Error ? err.message : "Could not create the account.", website);
   }
   await startSession(account);
-  redirect("/");
+  redirect(website ? `/start?step=2&website=${encodeURIComponent(website)}` : "/");
 }
 
 export async function logout() {

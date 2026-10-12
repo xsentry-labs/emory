@@ -156,3 +156,21 @@ export function getAccount(db: DB, userId: number): Account | null {
 export function listWorkspaceIds(db: DB): number[] {
   return (db.prepare(`SELECT id FROM workspaces ORDER BY id`).all() as { id: number }[]).map((r) => r.id);
 }
+
+export interface WorkspaceSummary {
+  id: number;
+  name: string;
+  ownerEmail: string | null;
+  createdAt: number;
+}
+
+export function listWorkspaceSummaries(db: DB): WorkspaceSummary[] {
+  return (
+    db
+      .prepare(
+        `SELECT w.id, w.name, w.created_at AS createdAt, u.email AS ownerEmail
+         FROM workspaces w LEFT JOIN users u ON u.id = w.owner_user_id ORDER BY w.id`,
+      )
+      .all() as WorkspaceSummary[]
+  );
+}

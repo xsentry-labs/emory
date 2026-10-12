@@ -1,5 +1,6 @@
 import type { DB } from "../db";
 import type { StructuredLlm } from "../llm";
+import { charge } from "../quota";
 import { getBusiness, getProfile } from "../repo";
 import { fetchRaw } from "../safeFetch";
 import { runChecks, scoreSite, type Issue, type PageData } from "./checks";
@@ -112,6 +113,7 @@ export function startAudit(db: DB, deps: AuditDeps, siteInput?: string): boolean
   if (running().has(db)) return false;
   const site = (siteInput ?? "").trim() || getBusiness(db).website;
   if (!site) throw new Error("Enter your website address first.");
+  charge(db, "seo");
   const id = Number(
     db.prepare(`INSERT INTO seo_audits (site, status, created_at) VALUES (?, 'running', ?)`).run(site, Date.now()).lastInsertRowid,
   );
