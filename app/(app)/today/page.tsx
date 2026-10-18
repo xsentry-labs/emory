@@ -127,7 +127,7 @@ export default function TodayPage({ searchParams }: { searchParams: { track?: st
       <aside aria-label="Tracks this week" className="flex flex-col gap-1 lg:w-80 lg:shrink-0 lg:border-l lg:border-dashed lg:border-line lg:pl-6">
         <span className="pb-1.5 font-mono text-[13px] text-ink">tracks this week</span>
         {[
-          { href: "/seo", head: w.siteScore === null ? "site · not audited" : `site · ${w.siteScore} / 100`, sub: `${w.siteIssues} open issues` },
+          { href: "/site", head: w.siteScore === null ? "site · not audited" : `site · ${w.siteScore} / 100`, sub: `${w.siteIssues} open issues` },
           { href: "/leads", head: `leads · ${w.leadsFound} found`, sub: `${w.leadsScored} researched and scored` },
           { href: "/approvals", head: `outreach · ${w.sent} sent`, sub: `${w.replies} repl${w.replies === 1 ? "y" : "ies"}` },
           { href: "/content", head: `social · ${w.postsDrafted} posts drafted`, sub: "x and blog drafts to copy out" },

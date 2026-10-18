@@ -7,8 +7,10 @@ import type { StructuredLlm } from "./llm";
 import { getBusiness, saveBusiness, saveProfile } from "./repo";
 import { fetchRaw, normalizeUrl } from "./safeFetch";
 import type { SeoReport } from "./seo/audit";
+import { syncIssues } from "./site/issues";
 import { categoryScores, type Category } from "./seo/categories";
-import { runChecks, scoreSite, type PageData } from "./seo/checks";
+import { measureSpeed, type AuditDeps } from "./seo/audit";
+import { runChecks, scoreSite, speedIssue, type PageData } from "./seo/checks";
 import { crawlSite, type Fetcher } from "./seo/crawl";
 
 /**
@@ -132,6 +134,7 @@ export interface ReportDeps {
   llm: StructuredLlm | null;
   fetchPage?: Fetcher;
   maxPages?: number;
+  speed?: AuditDeps["speed"];
 }
 
 /** Crawl, check, guess the business. Persists progress as it goes. Awaitable for tests. */
@@ -147,7 +150,9 @@ export async function runReport(db: AccountsDb, id: string, site: string, deps: 
     );
     if (crawl.pages.length === 0) throw new Error("We couldn't read any pages on that site.");
     progress({ step: "seo checks" });
-    const issues = runChecks(crawl.pages, crawl.site);
+    const speed = await measureSpeed(crawl.pages[0].url, deps.speed);
+    const slow = speed ? speedIssue(speed) : null;
+    const issues = [...runChecks(crawl.pages, crawl.site), ...(slow ? [slow] : [])];
     const report = {
       site,
       score: scoreSite(issues, crawl.pages.length),
@@ -157,6 +162,7 @@ export async function runReport(db: AccountsDb, id: string, site: string, deps: 
       issues,
       pages: crawl.pages.map(({ url, status, title, description, words, ms }) => ({ url, status, title, description, words, ms })),
       plan: null,
+      speed,
       planError: "",
     };
     db.prepare(`UPDATE reports SET report_json = ? WHERE id = ?`).run(JSON.stringify(report), id);
@@ -221,6 +227,7 @@ export function claimReport(accounts: AccountsDb, id: string, workspaceId: numbe
     if (report.guess && !current.offer && !current.icp) saveProfile(ws, { offer: report.guess.offer, icp: report.guess.icp });
     const business = getBusiness(ws);
     saveBusiness(ws, { website: business.website || report.site, context: business.context });
+    syncIssues(ws, report.report!.issues, report.finishedAt ?? Date.now());
     setKv(ws, "tracks", JSON.stringify(tracks));
   })();
   return true;

@@ -2,6 +2,9 @@ import Link from "next/link";
 import { PERMISSIONS, TRACK_NAMES, chosenTracks, listConnections, type Connection } from "@/lib/connections";
 import { TRACK_IDS } from "@/lib/report";
 import { currentUser, getDb } from "@/lib/request-db";
+import { getConnection } from "@/lib/integrations/store";
+import type { GithubConnection } from "@/lib/site/fixes";
+import type { GoogleConnection } from "@/lib/site/results";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +16,11 @@ function Row({ c }: { c: Connection }) {
         <span className="font-mono text-[15px] text-ink">{c.name}</span>
         <span>{c.detail}</span>
       </span>
+      {c.href ? (
+        <a href={c.href} className="btn">
+          {c.status}
+        </a>
+      ) : (
       <span
         className={cn(
           "inline-flex items-center gap-1.5 font-mono text-xs",
@@ -23,6 +31,7 @@ function Row({ c }: { c: Connection }) {
         {c.state === "connected" || c.state === "ready" ? <span className="size-2 bg-accent" aria-hidden /> : null}
         {c.status}
       </span>
+      )}
     </li>
   );
 }
@@ -30,7 +39,13 @@ function Row({ c }: { c: Connection }) {
 export default function ConnectPage() {
   const user = currentUser()!;
   const chosen = chosenTracks(getDb());
-  const connections = listConnections(user.workspaceId);
+  const db = getDb();
+  const gh = getConnection<GithubConnection>(db, "github");
+  const google = getConnection<GoogleConnection>(db, "google");
+  const connections = listConnections(user.workspaceId, process.env, {
+    github: gh ? (gh.config.repo ?? "installed · pick a repo in site settings") : null,
+    google: google ? (google.config.property ?? "connected") : null,
+  });
   const order = [...chosen, ...TRACK_IDS.filter((t) => !chosen.includes(t))];
 
   return (

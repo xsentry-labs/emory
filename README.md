@@ -35,6 +35,31 @@ One deployable unit: a single Railway container with a volume.
 
 The SQLite file lives on the volume, so run exactly **one replica** (set in `railway.json`).
 
+## Site: fixes, pull requests and results
+
+- **Issues** (`/site`): every audit upserts one issue per rule (`lib/site/issues.ts`). An open or in-PR issue that a later crawl no longer finds closes as fixed; one that comes back reopens. Issues are grouped as code, content, server or redirects (`lib/seo/categories.ts`).
+- **Mobile speed**: audits and the public report run PageSpeed Insights on the homepage (`lib/integrations/pagespeed.ts`); a score under 90 becomes an issue. A PageSpeed failure never fails the audit.
+- **Pull requests** (`/site/fixes`): with the GitHub App installed and a repository chosen, tick code issues and Emory reads the repo, has the model propose minimal edits (at most 4 files, each validated against the real file: no unknown paths, no no-ops, no wholesale rewrites), and opens **one PR per batch** on an `emory/seo-*` branch (`lib/site/fixes.ts`). Emory never merges. The worker syncs PR state every 5 minutes; a merge schedules a re-crawl 15 minutes later, which is what closes the issues. Closing a PR unmerged reopens its issues.
+- **Written steps**: any issue (and every one when no repo is connected) can get step-by-step instructions plus ready-to-paste copy.
+- **Results** (`/site/results`): Search Console clicks, impressions and position per page per day are synced daily into `gsc_daily` (16 weeks on first sync). Fixed pages compare two weeks either side of the fix and say "too early" until two weeks of data exist.
+- **Nightly crawl**: the worker re-crawls any site whose last audit is over 24 hours old. Scheduled crawls don't count toward the plan's audit allowance.
+- **Connections** are stored per workspace in `connections`; tokens are encrypted with AES-256-GCM (`lib/secrets.ts`). OAuth `state` is signed and bound to the workspace, provider and a 15-minute expiry.
+- CMS drafts (WordPress, Webflow, Shopify) are not built yet; content issues get written steps.
+
+### GitHub App
+
+Create one at GitHub → Settings → Developer settings → GitHub Apps → New:
+
+- **Homepage URL**: your `APP_URL`.
+- **Callback URL** and **Setup URL**: `APP_URL/api/connect/github/callback`. Tick **Request user authorization (OAuth) during installation** (the callback uses it to confirm the installer can access the installation) and **Redirect on update**.
+- **Webhook**: off (Emory polls).
+- **Repository permissions**: Contents read & write, Pull requests read & write, Checks read-only, Metadata read-only.
+- Generate a private key and a client secret. Set `GITHUB_APP_ID`, `GITHUB_APP_SLUG` (from the App's public URL), `GITHUB_APP_PRIVATE_KEY`, `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`.
+
+### Google (Search Console)
+
+In Google Cloud: enable the **Google Search Console API**, configure the OAuth consent screen with the scope `https://www.googleapis.com/auth/webmasters.readonly`, and create an **OAuth client ID** (web application) with the redirect URI `APP_URL/api/connect/google/callback`. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `APP_URL`. Optionally create an API key with the PageSpeed Insights API enabled and set `PAGESPEED_API_KEY`.
+
 ## Limits
 
 - Lead sourcing quality depends on the model and its web search; always review new leads. Most sourced leads will have no public email, so add one before they can be emailed.

@@ -28,6 +28,7 @@ const META: Record<string, { category: Category; fix: FixType }> = {
   "img-alt": { category: "content", fix: "content" },
   "no-viewport": { category: "mobile speed", fix: "code fix" },
   slow: { category: "mobile speed", fix: "server" },
+  "mobile-slow": { category: "mobile speed", fix: "code fix" },
   "no-schema": { category: "structured data", fix: "code fix" },
   "no-og": { category: "structured data", fix: "code fix" },
 };

@@ -158,3 +158,17 @@ export function scoreSite(issues: Issue[], pageCount: number): number {
   }
   return Math.max(0, Math.round(100 - penalty));
 }
+
+/** Lighthouse mobile result for the homepage, turned into an issue when it is slow. */
+export function speedIssue(ps: { url: string; performance: number; lcpMs: number | null }): Issue | null {
+  if (ps.performance >= 90) return null;
+  const lcp = ps.lcpMs === null ? "" : ` Largest content takes ${(ps.lcpMs / 1000).toFixed(1)}s to appear (aim for under 2.5s).`;
+  return {
+    id: "mobile-slow",
+    severity: ps.performance < 50 ? "high" : "medium",
+    title: `Slow on mobile (speed score ${ps.performance})`,
+    detail: `Google's mobile test scores the homepage ${ps.performance}/100.${lcp} Compress and resize large images, defer scripts that aren't needed up front, and cache static files.`,
+    pages: [ps.url],
+    count: 1,
+  };
+}
