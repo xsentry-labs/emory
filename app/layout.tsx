@@ -1,22 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
 import { cookies } from "next/headers";
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
+// Fonts are bundled from npm rather than fetched from Google at build time,
+// so builds work without network access.
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/ibm-plex-mono/600.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/500.css";
 import "./globals.css";
-
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-mono",
-  display: "swap",
-});
-
-const sans = IBM_Plex_Sans({
-  subsets: ["latin"],
-  weight: ["400", "500"],
-  variable: "--font-sans",
-  display: "swap",
-});
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +24,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const theme = parseTheme(cookies().get(THEME_COOKIE)?.value);
   return (
-    <html lang="en" data-theme={theme} className={`${mono.variable} ${sans.variable}`}>
+    <html lang="en" data-theme={theme}>
       <body className="min-h-screen bg-paper text-mute">{children}</body>
     </html>
   );
