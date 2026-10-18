@@ -72,7 +72,7 @@ describe("quota", () => {
     const s = quotaSummary(db);
     expect(s.plan).toEqual({ id: "growth", name: "Growth" });
     expect(s.items.find((i) => i.kind === "ai")).toMatchObject({ used: 3, limit: 400 });
-    expect(s.items.map((i) => i.kind)).toEqual(["leads", "seo", "ai"]);
+    expect(s.items.map((i) => i.kind)).toEqual(["leads", "enrich", "seo", "ai"]);
   });
 });
 

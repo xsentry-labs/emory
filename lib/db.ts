@@ -163,11 +163,86 @@ const MIGRATIONS: string[] = [
     PRIMARY KEY (day, page)
   );
   `,
+  `
+  -- Companies. People (prospects) belong to one; leads found before accounts existed get one per company.
+  CREATE TABLE accounts (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    domain TEXT NOT NULL DEFAULT '',
+    website TEXT NOT NULL DEFAULT '',
+    industry TEXT NOT NULL DEFAULT '',
+    employees INTEGER,
+    location TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    linkedin_url TEXT NOT NULL DEFAULT '',
+    apollo_id TEXT NOT NULL DEFAULT '',
+    fit INTEGER,
+    fit_reason TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','mapped','approaching','in_conversation','dropped')),
+    source TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  CREATE UNIQUE INDEX accounts_apollo ON accounts(apollo_id) WHERE apollo_id <> '';
+  CREATE INDEX accounts_domain ON accounts(domain);
+
+  ALTER TABLE prospects ADD COLUMN account_id INTEGER REFERENCES accounts(id) ON DELETE SET NULL;
+  ALTER TABLE prospects ADD COLUMN title TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN seniority TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN apollo_id TEXT NOT NULL DEFAULT '';
+  -- verified | guessed | unavailable | manual | '' (not looked up yet)
+  ALTER TABLE prospects ADD COLUMN email_status TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN email_source TEXT NOT NULL DEFAULT '';
+  -- Org chart: who they report to (always a guess unless a person confirmed it) and their buying role.
+  ALTER TABLE prospects ADD COLUMN reports_to INTEGER REFERENCES prospects(id) ON DELETE SET NULL;
+  ALTER TABLE prospects ADD COLUMN reports_verified INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE prospects ADD COLUMN buying_role TEXT NOT NULL DEFAULT '';
+  ALTER TABLE prospects ADD COLUMN role_reason TEXT NOT NULL DEFAULT '';
+  CREATE INDEX prospects_account ON prospects(account_id);
+  CREATE UNIQUE INDEX prospects_apollo ON prospects(apollo_id) WHERE apollo_id <> '';
+
+  -- Existing leads: one account per company (or website), linked back.
+  INSERT INTO accounts (name, website, domain, source, created_at, updated_at)
+    SELECT COALESCE(NULLIF(company, ''), name), MAX(website), '', 'earlier lead search', MIN(created_at), MAX(updated_at)
+    FROM prospects GROUP BY lower(COALESCE(NULLIF(company, ''), name));
+  UPDATE prospects SET account_id = (
+    SELECT a.id FROM accounts a WHERE lower(a.name) = lower(COALESCE(NULLIF(prospects.company, ''), prospects.name)));
+  UPDATE prospects SET email_status = 'manual' WHERE email <> '';
+
+  -- An approved approach: one row per planned touch, drafted when due.
+  CREATE TABLE approaches (
+    id INTEGER PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    headline TEXT NOT NULL,
+    rationale TEXT NOT NULL DEFAULT '',
+    rules_json TEXT NOT NULL DEFAULT '[]',
+    status TEXT NOT NULL CHECK (status IN ('proposed','approved','paused','done')),
+    created_at INTEGER NOT NULL,
+    approved_at INTEGER
+  );
+  CREATE TABLE approach_steps (
+    id INTEGER PRIMARY KEY,
+    approach_id INTEGER NOT NULL REFERENCES approaches(id) ON DELETE CASCADE,
+    prospect_id INTEGER NOT NULL REFERENCES prospects(id) ON DELETE CASCADE,
+    position INTEGER NOT NULL,
+    day_offset INTEGER NOT NULL,
+    channel TEXT NOT NULL CHECK (channel IN ('email','call','linkedin','meeting')),
+    summary TEXT NOT NULL,
+    angle TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned','drafted','done','skipped')),
+    message_id INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+    due_at INTEGER
+  );
+  CREATE INDEX approach_steps_due ON approach_steps(status, due_at);
+  `,
 ];
 
-export function migrate(db: DB): void {
+/** Bring the schema up to date (or up to `target`, for tests of a migration over existing data). */
+export const SCHEMA_VERSION = () => MIGRATIONS.length;
+
+export function migrate(db: DB, target = MIGRATIONS.length): void {
   const current = db.pragma("user_version", { simple: true }) as number;
-  for (let v = current; v < MIGRATIONS.length; v++) {
+  for (let v = current; v < target; v++) {
     db.transaction(() => {
       db.exec(MIGRATIONS[v]);
       db.pragma(`user_version = ${v + 1}`);

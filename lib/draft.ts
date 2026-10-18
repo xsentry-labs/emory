@@ -23,6 +23,8 @@ export async function draftMessage(
   llm: StructuredLlm,
   prospectId: number,
   kind: "outreach" | "followup",
+  /** Extra direction from an approach plan: the angle and what this touch should do. */
+  brief = "",
 ): Promise<number> {
   const prospect = getProspect(db, prospectId);
   if (!prospect) throw new Error(`Lead ${prospectId} not found`);
@@ -41,10 +43,12 @@ export async function draftMessage(
     `<ideal_customer>\n${profile.icp || "(not specified)"}\n</ideal_customer>`,
     `<recipient>`,
     `Name: ${prospect.name}`,
+    prospect.title ? `Title: ${prospect.title}` : "",
     `Company: ${prospect.company || "(unknown)"}`,
     `Website: ${prospect.website || "(unknown)"}`,
     `Research notes: ${prospect.notes || "(none)"}`,
     `</recipient>`,
+    brief ? `<plan_for_this_email>\n${brief}\n</plan_for_this_email>` : "",
     history ? `<conversation_so_far>\n${history}\n</conversation_so_far>` : "",
   ]
     .filter(Boolean)

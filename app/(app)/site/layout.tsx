@@ -1,5 +1,5 @@
 import { recrawl } from "@/app/site-actions";
-import { SiteTabs } from "@/components/site-section/tabs";
+import { SectionTabs } from "@/components/shell/section-tabs";
 import { SubmitButton } from "@/components/start/form-bits";
 import { getBusiness } from "@/lib/repo";
 import { getDb } from "@/lib/request-db";
@@ -21,7 +21,8 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-dashed border-line">
         <span className="font-mono text-sm text-ink">/ site{site ? ` · ${site.replace(/^https?:\/\//, "")}` : ""}</span>
-        <SiteTabs
+        <SectionTabs
+          label="Site views"
           tabs={[
             { href: "/site", label: `issues · ${open}` },
             { href: "/site/fixes", label: `fixes · ${prs} open` },

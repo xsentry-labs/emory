@@ -4,12 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-export function SiteTabs({ tabs }: { tabs: { href: string; label: string }[] }) {
+export function SectionTabs({ tabs, label }: { tabs: { href: string; label: string }[]; label: string }) {
   const pathname = usePathname();
+  // Longest matching tab wins, so /accounts/12 lights "accounts" but /site/fixes doesn't light "issues".
+  const best = tabs
+    .filter((t) => pathname === t.href || pathname.startsWith(`${t.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   return (
-    <nav aria-label="Site views" className="flex gap-[22px] overflow-x-auto">
+    <nav aria-label={label} className="flex gap-[22px] overflow-x-auto">
       {tabs.map((t) => {
-        const active = pathname === t.href;
+        const active = t.href === best;
         return (
           <Link
             key={t.href}

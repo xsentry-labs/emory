@@ -1,5 +1,6 @@
 import type { DB } from "./db";
 import { getPipeline } from "./pipeline";
+import { dueTasks, listApproaches } from "./leads/approach";
 import { latestAudit } from "./seo/audit";
 import { listPrs } from "./site/fixes";
 import { listIssues } from "./site/issues";
@@ -139,6 +140,34 @@ function leadItems(db: DB): TodayItem[] {
   return out;
 }
 
+function approachItems(db: DB, at: number): TodayItem[] {
+  const out: TodayItem[] = [];
+  for (const ap of listApproaches(db).filter((x) => x.status === "proposed" || x.status === "paused").slice(0, 5)) {
+    const people = new Set(ap.steps.map((s) => s.prospect_id)).size;
+    out.push({
+      key: `approach:${ap.id}`,
+      track: "leads",
+      label: ap.status === "proposed" ? "leads · approach ready" : "leads · approach paused",
+      title: ap.status === "proposed" ? `${ap.account_name}: ${ap.headline}` : `${ap.account_name}: someone replied, so the plan paused`,
+      detail: ap.status === "proposed" ? `${people} ${people === 1 ? "person" : "people"} · nothing goes out until you approve it` : "read the reply, then resume or stop the plan.",
+      at: ap.created_at,
+      href: `/accounts/${ap.account_id}/approach`,
+    });
+  }
+  for (const t of dueTasks(db, at).slice(0, 5)) {
+    out.push({
+      key: `task:${t.id}`,
+      track: "leads",
+      label: `leads · ${t.channel} today`,
+      title: `${t.name} at ${t.account_name}: ${t.summary}`,
+      detail: t.angle,
+      at: t.due_at ?? at,
+      href: `/accounts/${t.account_id}/approach`,
+    });
+  }
+  return out;
+}
+
 function siteItems(db: DB): TodayItem[] {
   const out: TodayItem[] = [];
   for (const pr of listPrs(db).filter((p) => p.status === "open" || p.status === "failed").slice(0, 3)) {
@@ -251,7 +280,7 @@ function overnight(db: DB, at: number): string[] {
 }
 
 export function todayView(db: DB, at = Date.now()): TodayView {
-  const all = [...replyItems(db), ...siteItems(db), ...draftItems(db), ...leadItems(db), ...socialItems(db)];
+  const all = [...replyItems(db), ...siteItems(db), ...approachItems(db, at), ...draftItems(db), ...leadItems(db), ...socialItems(db)];
   // Hot first, then oldest first within the rest so nothing waits forever.
   const items = [...all.filter((i) => i.hot), ...all.filter((i) => !i.hot)];
   const counts = { all: items.length, replies: 0, site: 0, leads: 0, social: 0 };
