@@ -4,6 +4,10 @@
 
 @layer base {
   /* Dark is the default; light is opt-in via data-theme="light" on <html>. */
+  :root {
+    --font-mono: "IBM Plex Mono";
+    --font-sans: "IBM Plex Sans";
+  }
   :root,
   :root[data-theme="dark"] {
     color-scheme: dark;
