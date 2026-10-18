@@ -77,6 +77,7 @@ export async function decide(formData: FormData) {
     .parse(Object.fromEntries(formData));
   decideDraft(getDb(), input.id, input.decision, { subject: input.subject, body: input.body });
   revalidatePath("/approvals");
+  revalidatePath("/today");
   revalidatePath("/prospects", "layout");
 }
 
@@ -160,13 +161,7 @@ export async function findLeads(formData: FormData) {
   redirect(target);
 }
 
-/** Step 1: read the website and pre-fill what we think the business does. */
-export async function submitWebsite(formData: FormData) {
-  const website = String(formData.get("website") ?? "").trim();
-  redirect(`/start?step=2&website=${encodeURIComponent(website)}`);
-}
-
-/** Step 2: build the profile from website + description + docs, then start finding leads. */
+/** Build the offer and ideal customer from website + description + docs, then start finding leads. */
 export async function submitBusiness(formData: FormData) {
   const website = String(formData.get("website") ?? "").trim();
   const description = String(formData.get("description") ?? "");
@@ -186,7 +181,7 @@ export async function submitBusiness(formData: FormData) {
     error = err instanceof Error ? err.message : "Something went wrong.";
   }
   if (error) {
-    redirect(`/start?step=2&website=${encodeURIComponent(website)}&error=${encodeURIComponent(error)}`);
+    redirect(`/setup/business?error=${encodeURIComponent(error)}`);
   }
   redirect("/leads");
 }

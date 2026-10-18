@@ -25,7 +25,7 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           {signedIn ? (
-            <Link href="/plays" className={cn(buttonVariants({ size: "sm" }))}>
+            <Link href="/today" className={cn(buttonVariants({ size: "sm" }))}>
               Open app
             </Link>
           ) : (
@@ -33,8 +33,8 @@ export function SiteHeader({ signedIn }: { signedIn: boolean }) {
               <Link href="/login" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
                 Log in
               </Link>
-              <Link href="/signup" className={cn(buttonVariants({ size: "sm" }))}>
-                Start free
+              <Link href="/start" className={cn(buttonVariants({ size: "sm" }))}>
+                Free report
               </Link>
             </>
           )}

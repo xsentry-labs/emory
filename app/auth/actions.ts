@@ -3,7 +3,10 @@
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createAccount, getAccountsDb, inviteCodeMatches, verifyLogin, type Account } from "@/lib/accounts";
+import { getWorkspaceDb } from "@/lib/db";
+import { kickoffTracks } from "@/lib/kickoff";
 import { allow } from "@/lib/ratelimit";
+import { claimReport, parseTracks } from "@/lib/report";
 import { SESSION_COOKIE, SESSION_TTL_MS, sessionSecret, signSession } from "@/lib/session-token";
 
 async function startSession(account: Account) {
@@ -20,8 +23,8 @@ async function startSession(account: Account) {
 
 const clientKey = () => headers().get("x-forwarded-for")?.split(",")[0].trim() || "local";
 const field = (fd: FormData, name: string) => String(fd.get(name) ?? "");
-const back = (page: string, error: string, website = ""): never =>
-  redirect(`${page}?error=${encodeURIComponent(error)}${website ? `&website=${encodeURIComponent(website)}` : ""}`);
+const back = (page: string, error: string, report = ""): never =>
+  redirect(`${page}?error=${encodeURIComponent(error)}${report ? `&report=${encodeURIComponent(report)}` : ""}`);
 
 export async function login(formData: FormData) {
   const email = field(formData, "email");
@@ -35,11 +38,12 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
-  const website = field(formData, "website").trim().slice(0, 300);
-  if (!allow(`signup:${clientKey()}`, 10, 60 * 60_000)) back("/signup", "Too many attempts. Try again later.", website);
+  // A site report run before sign-up, to claim into the new workspace.
+  const report = field(formData, "report").trim().slice(0, 40);
+  if (!allow(`signup:${clientKey()}`, 10, 60 * 60_000)) back("/signup", "Too many attempts. Try again later.", report);
   const invite = process.env.INVITE_CODE;
-  if (!invite) back("/signup", "Sign-ups are closed. Ask the owner to set an invite code.", website);
-  if (!inviteCodeMatches(field(formData, "invite"), invite)) back("/signup", "That invite code is not valid.", website);
+  if (!invite) back("/signup", "Sign-ups are closed. Ask the owner to set an invite code.", report);
+  if (!inviteCodeMatches(field(formData, "invite"), invite)) back("/signup", "That invite code is not valid.", report);
   let account: Account;
   try {
     account = createAccount(getAccountsDb(), {
@@ -48,10 +52,13 @@ export async function signup(formData: FormData) {
       workspaceName: field(formData, "company"),
     });
   } catch (err) {
-    return back("/signup", err instanceof Error ? err.message : "Could not create the account.", website);
+    return back("/signup", err instanceof Error ? err.message : "Could not create the account.", report);
   }
   await startSession(account);
-  redirect(website ? `/start?step=2&website=${encodeURIComponent(website)}` : "/");
+  const db = getWorkspaceDb(account.workspaceId);
+  const claimed = Boolean(report) && claimReport(getAccountsDb(), report, account.workspaceId, db, parseTracks(formData.getAll("track").map(String)));
+  if (claimed) kickoffTracks(db);
+  redirect(claimed ? "/setup/connect" : "/start");
 }
 
 export async function logout() {

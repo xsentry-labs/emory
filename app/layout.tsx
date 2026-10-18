@@ -1,17 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Newsreader } from "next/font/google";
+import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { cookies } from "next/headers";
+import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import "./globals.css";
 
-const display = Newsreader({
+const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: ["400", "500", "600"],
-  style: ["normal", "italic"],
-  variable: "--font-display",
+  variable: "--font-mono",
   display: "swap",
 });
 
-const sans = Inter({
+const sans = IBM_Plex_Sans({
   subsets: ["latin"],
+  weight: ["400", "500"],
   variable: "--font-sans",
   display: "swap",
 });
@@ -19,20 +21,19 @@ const sans = Inter({
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Emory Growth",
-  description: "A growth agent that finds, qualifies and ranks leads, runs outreach with your approval, and follows up until they book a conversation.",
+  title: "Emory",
+  description: "Your website in, a growth plan out. Emory fixes what hurts search, finds who to sell to, and runs outreach with your approval.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0D0D0F",
+  themeColor: "#1b1b1c",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const theme = parseTheme(cookies().get(THEME_COOKIE)?.value);
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable}`}>
-      <body className="min-h-screen bg-paper">
-        {children}
-      </body>
+    <html lang="en" data-theme={theme} className={`${mono.variable} ${sans.variable}`}>
+      <body className="min-h-screen bg-paper text-mute">{children}</body>
     </html>
   );
 }

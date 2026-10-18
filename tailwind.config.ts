@@ -1,9 +1,13 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Emory. The brand is black and white. The one functional colour is
- * `danger`, for destructive or rejected states. No gradients, no tints.
+ * Emory. Grey ground, IBM Plex Mono for headings and controls, Plex Sans for
+ * reading, one periwinkle accent for the next action. Dark by default; every
+ * colour is a CSS variable so the light theme is a token swap (globals.css).
  */
+// Relative colour syntax keeps Tailwind's /opacity modifiers working on CSS variables.
+const c = (name: string) => `rgb(from var(--${name}) r g b / <alpha-value>)`;
+
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -13,9 +17,13 @@ const config: Config = {
   theme: {
     // hero clamp(38,5.4vw,60) · section 31 · h3 22 · body 16.5 · caption 13.5
     fontSize: {
+      xs: ["0.75rem", { lineHeight: "1.1rem" }],
       caption: ["0.84375rem", { lineHeight: "1.25rem" }],
       sm: ["0.9375rem", { lineHeight: "1.4rem" }],
+      base: ["1rem", { lineHeight: "1.5rem" }],
       body: ["1.03125rem", { lineHeight: "1.6rem" }],
+      lg: ["1.125rem", { lineHeight: "1.6rem" }],
+      xl: ["1.25rem", { lineHeight: "1.75rem" }],
       lead: ["1.1875rem", { lineHeight: "1.75rem" }],
       h3: ["1.375rem", { lineHeight: "1.75rem" }],
       h2: ["1.5625rem", { lineHeight: "1.95rem" }],
@@ -25,15 +33,21 @@ const config: Config = {
     },
     extend: {
       colors: {
-        ink: "var(--ink)",
-        paper: "var(--paper)",
-        wash: "var(--wash)",
-        line: "var(--line)",
-        mute: "var(--mute)",
-        danger: "#6B1218",
+        ink: c("ink"),
+        paper: c("paper"),
+        wash: c("wash"),
+        line: c("line"),
+        mute: c("mute"),
+        field: "var(--field)",
+        "line-soft": "var(--line-soft)",
+        accent: c("accent"),
+        "accent-ink": "var(--accent-ink)",
+        "accent-wash": "var(--accent-wash)",
+        danger: c("danger"),
       },
       fontFamily: {
-        display: ["var(--font-display)", "Newsreader", "Georgia", "serif"],
+        display: ["var(--font-mono)", "ui-monospace", "monospace"],
+        mono: ["var(--font-mono)", "ui-monospace", "monospace"],
         sans: ["var(--font-sans)", "ui-sans-serif", "system-ui", "sans-serif"],
       },
       maxWidth: {
