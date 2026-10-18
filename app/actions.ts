@@ -28,7 +28,6 @@ import { consume } from "@/lib/usage";
 import { runOnboarding } from "@/lib/onboarding";
 import { getPipeline, startPipeline } from "@/lib/pipeline";
 import { playById } from "@/lib/plays";
-import { startAudit } from "@/lib/seo/audit";
 import { deleteItem, draftXPosts, suggestTopics, updateItem, writePost, type ContentStatus } from "@/lib/content";
 import { sourceLeads } from "@/lib/sourcing";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
@@ -258,20 +257,6 @@ export async function saveContact(formData: FormData) {
 }
 
 /** Crawl the site, run the checks and write a fix plan, in the background. */
-export async function runSeoAudit(formData: FormData) {
-  const site = z.string().trim().max(300).parse(String(formData.get("site") ?? ""));
-  let error = "";
-  try {
-    const db = getDb();
-    consume(db, "seo");
-    if (isLlmConfigured()) consume(db, "ai");
-    startAudit(db, { llm: isLlmConfigured() ? openRouterLlm : null }, site);
-  } catch (err) {
-    error = err instanceof Error ? err.message : "Could not start the audit.";
-  }
-  redirect(error ? `/seo?error=${encodeURIComponent(error)}` : "/seo");
-}
-
 /** Admin only: move a workspace to a plan. */
 export async function setWorkspacePlan(formData: FormData) {
   const input = z.object({ workspaceId: id, plan: z.string() }).parse(Object.fromEntries(formData));

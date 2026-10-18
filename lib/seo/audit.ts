@@ -3,7 +3,9 @@ import type { StructuredLlm } from "../llm";
 import { charge } from "../quota";
 import { getBusiness, getProfile } from "../repo";
 import { fetchRaw } from "../safeFetch";
-import { runChecks, scoreSite, type Issue, type PageData } from "./checks";
+import type { PageSpeed } from "../integrations/pagespeed";
+import { syncIssues } from "../site/issues";
+import { runChecks, scoreSite, speedIssue, type Issue, type PageData } from "./checks";
 import { crawlSite, type Fetcher } from "./crawl";
 import { buildPlan, type SeoPlan } from "./plan";
 
@@ -16,6 +18,8 @@ export interface SeoReport {
   /** Per-page snapshot for the report table. */
   pages: Pick<PageData, "url" | "status" | "title" | "description" | "words" | "ms">[];
   plan: SeoPlan | null;
+  /** Lighthouse mobile result for the homepage, when PageSpeed answered. */
+  speed?: PageSpeed | null;
   /** Set if the AI plan failed; the automated findings are still valid. */
   planError: string;
 }
@@ -67,6 +71,19 @@ export interface AuditDeps {
   llm: StructuredLlm | null;
   fetchPage?: Fetcher;
   maxPages?: number;
+  /** Mobile speed test for the homepage; omitted in tests. A failure never fails the audit. */
+  speed?: (url: string) => Promise<PageSpeed>;
+}
+
+/** Run the speed test if one was given; a failure (quota, timeout) just leaves it out. */
+export async function measureSpeed(url: string, speed: AuditDeps["speed"]): Promise<PageSpeed | null> {
+  if (!speed) return null;
+  try {
+    return await speed(url);
+  } catch (err) {
+    console.error("[seo] pagespeed failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /** Crawl, check, and (if an LLM is available) write the fix plan. Persists the result. Awaitable for tests. */
@@ -74,7 +91,9 @@ export async function runAudit(db: DB, id: number, site: string, deps: AuditDeps
   try {
     const crawl = await crawlSite(site, deps.fetchPage ?? fetchRaw, deps.maxPages);
     if (crawl.pages.length === 0) throw new Error("We couldn't read any pages on that site.");
-    const issues = runChecks(crawl.pages, crawl.site);
+    const speed = await measureSpeed(crawl.pages[0].url, deps.speed);
+    const slow = speed ? speedIssue(speed) : null;
+    const issues = [...runChecks(crawl.pages, crawl.site), ...(slow ? [slow] : [])];
     const score = scoreSite(issues, crawl.pages.length);
     const profile = getProfile(db);
 
@@ -98,9 +117,13 @@ export async function runAudit(db: DB, id: number, site: string, deps: AuditDeps
       issues,
       pages: crawl.pages.map(({ url, status, title, description, words, ms }) => ({ url, status, title, description, words, ms })),
       plan,
+      speed,
       planError,
     };
-    db.prepare(`UPDATE seo_audits SET status = 'done', report_json = ?, finished_at = ? WHERE id = ?`).run(JSON.stringify(report), Date.now(), id);
+    db.transaction(() => {
+      db.prepare(`UPDATE seo_audits SET status = 'done', report_json = ?, finished_at = ? WHERE id = ?`).run(JSON.stringify(report), Date.now(), id);
+      syncIssues(db, issues);
+    })();
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : "The audit failed.";
     console.error("[seo] audit failed:", message);
@@ -109,11 +132,11 @@ export async function runAudit(db: DB, id: number, site: string, deps: AuditDeps
 }
 
 /** Start an audit in the background. Returns false if one is already running for this workspace. */
-export function startAudit(db: DB, deps: AuditDeps, siteInput?: string): boolean {
+export function startAudit(db: DB, deps: AuditDeps, siteInput?: string, opts: { scheduled?: boolean } = {}): boolean {
   if (running().has(db)) return false;
   const site = (siteInput ?? "").trim() || getBusiness(db).website;
   if (!site) throw new Error("Enter your website address first.");
-  charge(db, "seo");
+  if (!opts.scheduled) charge(db, "seo");
   const id = Number(
     db.prepare(`INSERT INTO seo_audits (site, status, created_at) VALUES (?, 'running', ?)`).run(site, Date.now()).lastInsertRowid,
   );

@@ -5,6 +5,7 @@ import { imapConfig, pollInbox } from "./imap";
 import { sendConfig, smtpMailer } from "./mailer";
 import { queueDueFollowups } from "./repo";
 import { sendApproved } from "./send";
+import { siteTick } from "./site/tick";
 
 const g = globalThis as unknown as {
   __emoryWorker?: NodeJS.Timeout;
@@ -29,8 +30,14 @@ export function startWorker(): void {
     g.__emoryBusy = true;
     try {
       for (const id of listWorkspaceIds(getAccountsDb())) {
-        const n = queueDueFollowups(getWorkspaceDb(id));
+        const db = getWorkspaceDb(id);
+        const n = queueDueFollowups(db);
         if (n > 0) console.log(`[worker] workspace ${id}: queued ${n} follow-up draft(s) for approval`);
+        try {
+          await siteTick(db);
+        } catch (err) {
+          console.error(`[worker] workspace ${id}: site tick failed`, err);
+        }
       }
 
       const sendingId = sendingWorkspaceId();

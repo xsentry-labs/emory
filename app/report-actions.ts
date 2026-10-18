@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAccountsDb } from "@/lib/accounts";
 import { getWorkspaceDb } from "@/lib/db";
+import { pageSpeed } from "@/lib/integrations/pagespeed";
 import { kickoffTracks } from "@/lib/kickoff";
 import { isLlmConfigured, openRouterLlm } from "@/lib/llm";
 import { allow } from "@/lib/ratelimit";
@@ -23,7 +24,7 @@ export async function startReportAction(formData: FormData) {
   if (runningReports() >= MAX_RUNNING) back("Emory is busy reading other sites. Try again in a minute.", website);
   let id = "";
   try {
-    id = startReport(getAccountsDb(), website, clientKey(), { llm: isLlmConfigured() ? openRouterLlm : null });
+    id = startReport(getAccountsDb(), website, clientKey(), { llm: isLlmConfigured() ? openRouterLlm : null, speed: (url) => pageSpeed(url) });
   } catch (err) {
     back(err instanceof Error ? err.message : "Couldn't start the scan.", website);
   }

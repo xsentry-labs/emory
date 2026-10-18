@@ -100,6 +100,69 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX content_kind ON content_items(kind, id);
   `,
+  `
+  -- One row per audit rule, kept across audits so an issue has a history and
+  -- closes itself when a later crawl no longer finds it.
+  CREATE TABLE site_issues (
+    id INTEGER PRIMARY KEY,
+    rule TEXT NOT NULL UNIQUE,
+    title TEXT NOT NULL,
+    detail TEXT NOT NULL DEFAULT '',
+    severity TEXT NOT NULL CHECK (severity IN ('high','medium','low')),
+    category TEXT NOT NULL,
+    fix_type TEXT NOT NULL,
+    pages_json TEXT NOT NULL DEFAULT '[]',
+    count INTEGER NOT NULL DEFAULT 1,
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','in_pr','fixed','dismissed')),
+    pr_id INTEGER REFERENCES site_prs(id),
+    first_seen INTEGER NOT NULL,
+    last_seen INTEGER NOT NULL,
+    fixed_at INTEGER
+  );
+  CREATE TABLE site_prs (
+    id INTEGER PRIMARY KEY,
+    repo TEXT NOT NULL,
+    number INTEGER,
+    url TEXT NOT NULL DEFAULT '',
+    branch TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('drafting','open','merged','closed','failed')),
+    checks TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    merged_at INTEGER
+  );
+  -- A proposed change for one issue: a file edit (code) or written steps.
+  CREATE TABLE site_fixes (
+    id INTEGER PRIMARY KEY,
+    issue_id INTEGER NOT NULL REFERENCES site_issues(id) ON DELETE CASCADE,
+    pr_id INTEGER REFERENCES site_prs(id),
+    kind TEXT NOT NULL CHECK (kind IN ('code','steps')),
+    title TEXT NOT NULL,
+    why TEXT NOT NULL DEFAULT '',
+    path TEXT NOT NULL DEFAULT '',
+    before TEXT NOT NULL DEFAULT '',
+    after TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX site_fixes_pr ON site_fixes(pr_id);
+  -- Third-party accounts. Secrets inside config are encrypted (lib/secrets.ts).
+  CREATE TABLE connections (
+    provider TEXT PRIMARY KEY,
+    config TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'connected' CHECK (status IN ('connected','error')),
+    error TEXT NOT NULL DEFAULT '',
+    updated_at INTEGER NOT NULL
+  );
+  -- Search Console rows, one per day and page.
+  CREATE TABLE gsc_daily (
+    day TEXT NOT NULL,
+    page TEXT NOT NULL,
+    clicks INTEGER NOT NULL,
+    impressions INTEGER NOT NULL,
+    position REAL NOT NULL,
+    PRIMARY KEY (day, page)
+  );
+  `,
 ];
 
 export function migrate(db: DB): void {

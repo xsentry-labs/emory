@@ -1,6 +1,8 @@
 import type { DB } from "./db";
 import { getPipeline } from "./pipeline";
 import { latestAudit } from "./seo/audit";
+import { listPrs } from "./site/fixes";
+import { listIssues } from "./site/issues";
 
 /**
  * The "today" hub: one queue across every track of the things Emory won't do
@@ -138,51 +140,68 @@ function leadItems(db: DB): TodayItem[] {
 }
 
 function siteItems(db: DB): TodayItem[] {
+  const out: TodayItem[] = [];
+  for (const pr of listPrs(db).filter((p) => p.status === "open" || p.status === "failed").slice(0, 3)) {
+    out.push(
+      pr.status === "open"
+        ? {
+            key: `pr:${pr.id}`,
+            track: "site",
+            label: `site · PR #${pr.number} ready`,
+            title: `review the fixes in ${pr.repo}`,
+            detail: `${pr.checks || "checks not reported"} · emory won't merge it`,
+            at: pr.createdAt,
+            href: `/site/fixes?pr=${pr.id}`,
+          }
+        : {
+            key: `pr:${pr.id}`,
+            track: "site",
+            label: "site · PR not opened",
+            title: "a batch of fixes couldn't be opened as a pull request",
+            detail: pr.error,
+            at: pr.createdAt,
+            href: "/site",
+          },
+    );
+  }
   const audit = latestAudit(db);
   if (!audit) {
-    return [
-      {
-        key: "site:none",
-        track: "site",
-        label: "site · not audited",
-        title: "run the first audit of your site",
-        detail: "about two minutes. finds what's hurting search and writes the fixes.",
-        at: Date.now(),
-        href: "/seo",
-      },
-    ];
+    out.push({
+      key: "site:none",
+      track: "site",
+      label: "site · not audited",
+      title: "run the first audit of your site",
+      detail: "about two minutes. finds what's hurting search and writes the fixes.",
+      at: Date.now(),
+      href: "/site",
+    });
+  } else if (audit.status === "error") {
+    out.push({
+      key: `site:error:${audit.id}`,
+      track: "site",
+      label: "site · audit failed",
+      title: `couldn't finish the audit of ${audit.site}`,
+      detail: audit.error,
+      at: audit.finished_at ?? audit.created_at,
+      href: "/site",
+    });
   }
-  if (audit.status === "error") {
-    return [
-      {
-        key: `site:error:${audit.id}`,
-        track: "site",
-        label: "site · audit failed",
-        title: `couldn't finish the audit of ${audit.site}`,
-        detail: audit.error,
-        at: audit.finished_at ?? audit.created_at,
-        href: "/seo",
-      },
-    ];
-  }
-  const report = audit.report;
-  if (audit.status !== "done" || !report) return [];
-  const high = report.issues.filter((i) => i.severity === "high");
-  if (high.length === 0) return [];
-  return [
-    {
-      key: `site:high:${audit.id}`,
+  const high = listIssues(db).filter((i) => i.status === "open" && i.severity === "high");
+  if (high.length) {
+    out.push({
+      key: `site:high:${high.map((i) => i.id).join(",")}`,
       track: "site",
       label: "site · fixes waiting",
-      title: `${high.length} high-impact issue${high.length === 1 ? "" : "s"} on ${report.site.replace(/^https?:\/\//, "")}`,
+      title: `${high.length} high-impact issue${high.length === 1 ? "" : "s"} to fix`,
       detail: high
         .slice(0, 3)
         .map((i) => i.title.toLowerCase())
         .join(" · "),
-      at: audit.finished_at ?? audit.created_at,
-      href: "/seo",
-    },
-  ];
+      at: Math.min(...high.map((i) => i.firstSeen)),
+      href: "/site",
+    });
+  }
+  return out;
 }
 
 function socialItems(db: DB): TodayItem[] {
@@ -205,7 +224,7 @@ function weekStats(db: DB, at: number): TodayStats {
   const audit = latestAudit(db);
   return {
     siteScore: audit?.report?.score ?? null,
-    siteIssues: audit?.report?.issues.length ?? 0,
+    siteIssues: listIssues(db).filter((i) => i.status === "open" || i.status === "in_pr").length,
     leadsFound: count(db, `SELECT COUNT(*) AS n FROM prospects WHERE created_at >= ?`, since),
     leadsScored: count(db, `SELECT COUNT(*) AS n FROM prospects WHERE researched_at >= ?`, since),
     sent: count(db, `SELECT COUNT(*) AS n FROM messages WHERE status = 'sent' AND sent_at >= ?`, since),

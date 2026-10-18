@@ -33,12 +33,12 @@ export interface SidebarProps {
 function items(p: SidebarProps): Item[] {
   return [
     { href: "/today", label: "today", badge: p.today },
-    { href: "/seo", label: "site", figure: p.siteScore === null ? undefined : String(p.siteScore) },
+    { href: "/site", label: "site", figure: p.siteScore === null ? undefined : String(p.siteScore) },
     { href: "/leads", label: "leads" },
     { href: "/accounts", label: "accounts", soon: true },
     { href: "/content", label: "social" },
     { href: "/approvals", label: "inbox", badge: p.pending },
-    { href: "/results", label: "results", soon: true },
+    { href: "/site/results", label: "results" },
     { href: "/profile", label: "memory" },
     { href: "/audit", label: "audit", soon: true },
     ...(p.isAdmin ? [{ href: "/admin", label: "admin" }] : []),
@@ -103,8 +103,12 @@ function Usage({ plan, usage }: Pick<SidebarProps, "plan" | "usage">) {
 
 export function Sidebar(props: SidebarProps) {
   const pathname = usePathname();
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
   const nav = items(props);
+  // The longest matching item wins, so /site/results lights "results", not "site".
+  const best = nav
+    .filter((i) => pathname === i.href || pathname.startsWith(`${i.href}/`))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const isActive = (href: string) => href === best;
 
   return (
     <>

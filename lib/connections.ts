@@ -19,6 +19,8 @@ export interface Connection {
   state: ConnectionState;
   /** Short status text shown beside the row. */
   status: string;
+  /** Where to go to connect it, when it can be connected now. */
+  href?: string;
 }
 
 export const TRACK_NAMES: Record<TrackId, string> = {
@@ -31,15 +33,38 @@ export const TRACK_NAMES: Record<TrackId, string> = {
 export const serverSendsFor = (workspaceId: number, env: Record<string, string | undefined> = process.env) =>
   Number(env.SENDING_WORKSPACE_ID) === workspaceId && Boolean(env.SMTP_URL && env.FROM_EMAIL);
 
-export function listConnections(workspaceId: number, env: Record<string, string | undefined> = process.env): Connection[] {
+/** What this workspace has connected; read by the caller from lib/integrations/store. */
+export interface Linked {
+  github: string | null;
+  google: string | null;
+}
+
+export function listConnections(
+  workspaceId: number,
+  env: Record<string, string | undefined> = process.env,
+  linked: Linked = { github: null, google: null },
+): Connection[] {
   const ai = isLlmConfigured();
   const mailbox = serverSendsFor(workspaceId, env);
+  const ghReady = Boolean(env.GITHUB_APP_ID && env.GITHUB_APP_PRIVATE_KEY && env.GITHUB_APP_SLUG);
+  const googleReady = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.APP_URL);
   return [
     {
       id: "site-source",
       track: "site",
-      name: "website source",
-      detail: "github, wordpress, webflow or shopify, so fixes arrive as a pull request or cms draft. emory never publishes.",
+      name: "github · website source",
+      detail: "code fixes arrive as a pull request on your repository. emory never merges.",
+      ...(linked.github
+        ? { state: "connected" as const, status: linked.github }
+        : ghReady
+          ? { state: "available" as const, status: "connect github", href: "/api/connect/github" }
+          : { state: "planned" as const, status: "not set up on server" }),
+    },
+    {
+      id: "cms",
+      track: "site",
+      name: "cms · wordpress, webflow, shopify",
+      detail: "content fixes saved as drafts in your cms. emory never publishes.",
       state: "planned",
       status: "next update",
     },
@@ -56,8 +81,11 @@ export function listConnections(workspaceId: number, env: Record<string, string 
       track: "site",
       name: "google search console",
       detail: "so results show clicks and rankings before and after each fix.",
-      state: "planned",
-      status: "next update",
+      ...(linked.google
+        ? { state: "connected" as const, status: linked.google }
+        : googleReady
+          ? { state: "available" as const, status: "connect", href: "/api/connect/google" }
+          : { state: "planned" as const, status: "not set up on server" }),
     },
     {
       id: "lead-search",
