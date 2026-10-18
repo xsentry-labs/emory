@@ -35,6 +35,14 @@ One deployable unit: a single Railway container with a volume.
 
 The SQLite file lives on the volume, so run exactly **one replica** (set in `railway.json`).
 
+## Leads: find, people, accounts, approaches
+
+- **Accounts and people**: every lead (a row in `prospects`) belongs to an account (`accounts`, `lib/leads/accounts.ts`). Leads from before accounts existed were grouped into one account per company by the migration; `createProspect` attaches new ones by domain or name.
+- **Find** (`/leads`, `lib/leads/find.ts`): a plain-English description becomes Apollo company filters (shown back as chips), the search runs on Apollo (`lib/integrations/apollo.ts`), and the model rates each company 0-100 with a one-line reason. Under 40 is kept but marked dropped, with the reason. The same description pages forward on "find more"; known companies are skipped. Stored companies count toward "leads found". Without `APOLLO_API_KEY`, find uses the earlier AI web search pipeline.
+- **People and org chart** (`/accounts/:id`, `lib/leads/people.ts`): Apollo lists people at the account by the titles in the description; the model guesses reporting lines and buying roles (decides, champion, uses it, budget). Guessed lines are drawn dashed. Confirming or correcting a line marks it verified, and a redraw never overwrites it. Loops are cut.
+- **Emails** (`/leads/people`): work emails are revealed through Apollo only when you ask (one plan "email found" each; personal emails are never requested). Each email records its source and status: verified, risky (guessed), not found, or manual (typed by you). **The sender never sends to a risky or not-found address.**
+- **Approaches** (`/accounts/:id/approach`, `lib/leads/approach.ts`): tick people on the chart and the model proposes an angle and 1-4 touches per person over up to 30 days. Nothing happens until you approve. Then the worker drafts each email step when due, into the normal approval queue, with three account rules: at most one person emailed per day, the whole plan pauses if anyone replies, and only verified or typed emails get email steps (others are skipped and say why). Calls, LinkedIn and meetings are tasks for you in "today".
+
 ## Site: fixes, pull requests and results
 
 - **Issues** (`/site`): every audit upserts one issue per rule (`lib/site/issues.ts`). An open or in-PR issue that a later crawl no longer finds closes as fixed; one that comes back reopens. Issues are grouped as code, content, server or redirects (`lib/seo/categories.ts`).

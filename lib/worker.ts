@@ -5,6 +5,8 @@ import { imapConfig, pollInbox } from "./imap";
 import { sendConfig, smtpMailer } from "./mailer";
 import { queueDueFollowups } from "./repo";
 import { sendApproved } from "./send";
+import { runDueSteps } from "./leads/approach";
+import { isLlmConfigured, openRouterLlm } from "./llm";
 import { siteTick } from "./site/tick";
 
 const g = globalThis as unknown as {
@@ -33,6 +35,12 @@ export function startWorker(): void {
         const db = getWorkspaceDb(id);
         const n = queueDueFollowups(db);
         if (n > 0) console.log(`[worker] workspace ${id}: queued ${n} follow-up draft(s) for approval`);
+        try {
+          const drafted = await runDueSteps(db, isLlmConfigured() ? openRouterLlm : null);
+          if (drafted) console.log(`[worker] workspace ${id}: drafted ${drafted} planned email(s) for approval`);
+        } catch (err) {
+          console.error(`[worker] workspace ${id}: approach steps failed`, err);
+        }
         try {
           await siteTick(db);
         } catch (err) {
