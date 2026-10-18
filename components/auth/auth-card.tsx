@@ -15,13 +15,13 @@ export function AuthCard({
 }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <Link href="/" className="mb-8 font-display text-h2 font-medium">
-        Emory
+      <Link href="/" className="mb-8 font-mono text-base tracking-[0.26em] text-ink">
+        emory
       </Link>
-      <h1 className="font-display text-section font-medium">{title}</h1>
+      <h1 className="text-[28px] font-semibold">{title}</h1>
       <p className="mb-6 mt-2 text-mute">{subtitle}</p>
       {error ? (
-        <p role="alert" className="mb-4 rounded-md border border-danger/30 px-4 py-3 text-sm text-danger">
+        <p role="alert" className="mb-4 border border-dashed border-danger/60 px-4 py-3 text-sm text-danger">
           {error}
         </p>
       ) : null}

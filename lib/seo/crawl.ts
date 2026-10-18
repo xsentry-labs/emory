@@ -40,7 +40,12 @@ const robotsState = (txt: string): SiteInfo["robotsTxt"] => {
  * staying on the same origin, up to maxPages. Pure with respect to the injected
  * fetcher, so it is testable without a network.
  */
-export async function crawlSite(startInput: string, fetchPage: Fetcher, maxPages = MAX_PAGES_DEFAULT): Promise<CrawlResult> {
+export async function crawlSite(
+  startInput: string,
+  fetchPage: Fetcher,
+  maxPages = MAX_PAGES_DEFAULT,
+  onProgress?: (read: number, target: number) => void,
+): Promise<CrawlResult> {
   const start = normalizeUrl(startInput);
   if (!start) throw new Error("Enter a valid website address.");
   const origin = start.origin;
@@ -100,6 +105,7 @@ export async function crawlSite(startInput: string, fetchPage: Fetcher, maxPages
   record(home);
   for (const l of pages[0]?.links ?? []) enqueue(l);
   if (sitemap) parseSitemapUrls(sitemap.body).forEach(enqueue);
+  onProgress?.(pages.length, Math.min(maxPages, pages.length + queue.length));
 
   while (queue.length > 0 && pages.length < maxPages) {
     const batch = queue.splice(0, Math.min(4, maxPages - pages.length));
@@ -118,6 +124,7 @@ export async function crawlSite(startInput: string, fetchPage: Fetcher, maxPages
       record(r);
       if (r.status >= 200 && r.status < 300) pages[pages.length - 1]?.links.forEach(enqueue);
     }
+    onProgress?.(pages.length, Math.min(maxPages, pages.length + queue.length));
   }
   return { pages, site, unreachable };
 }

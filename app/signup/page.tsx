@@ -4,31 +4,44 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { SubmitButton } from "@/components/start/form-bits";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getAccountsDb } from "@/lib/accounts";
+import { getReport } from "@/lib/report";
 
-export default function SignupPage({ searchParams }: { searchParams: { error?: string; website?: string } }) {
+const list = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v ? [v] : []);
+
+export default function SignupPage({
+  searchParams,
+}: {
+  searchParams: { error?: string; report?: string; email?: string; track?: string | string[] };
+}) {
+  const report = searchParams.report ? getReport(getAccountsDb(), searchParams.report) : null;
+  const site = report?.site.replace(/^https?:\/\//, "");
   return (
     <AuthCard
-      title="Create your account"
-      subtitle={searchParams.website ? `We'll start with ${searchParams.website}. You'll need an invite code to join.` : "You'll need an invite code to join."}
+      title="save your report"
+      subtitle={site ? `create an account to keep the report for ${site} and start on it. you'll need an invite code.` : "you'll need an invite code to join."}
       error={searchParams.error}
       footer={
         <>
-          Already have an account?{" "}
+          already have an account?{" "}
           <Link href="/login" className="underline">
-            Log in
+            log in
           </Link>
         </>
       }
     >
       <form action={signup} className="space-y-4">
-        <input type="hidden" name="website" value={searchParams.website ?? ""} />
+        {report ? <input type="hidden" name="report" value={report.id} /> : null}
+        {list(searchParams.track).map((t) => (
+          <input key={t} type="hidden" name="track" value={t} />
+        ))}
         <div className="space-y-1.5">
           <Label htmlFor="company">Company name</Label>
-          <Input id="company" name="company" autoComplete="organization" maxLength={120} />
+          <Input id="company" name="company" autoComplete="organization" maxLength={120} defaultValue={site ?? ""} />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required />
+          <Label htmlFor="email">Work email</Label>
+          <Input id="email" name="email" type="email" autoComplete="email" required defaultValue={searchParams.email ?? ""} />
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>

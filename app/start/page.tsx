@@ -1,105 +1,71 @@
-import { submitBusiness, submitWebsite } from "@/app/actions";
-import { DescriptionField, SubmitButton } from "@/components/start/form-bits";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { isLlmConfigured } from "@/lib/llm";
+import Link from "next/link";
+import { startReportAction } from "@/app/report-actions";
+import { SubmitButton } from "@/components/start/form-bits";
+import { currentUser } from "@/lib/request-db";
 
 export const dynamic = "force-dynamic";
 
-const STEPS = ["Your website", "Your service", "Your leads"];
+const GETS = [
+  { head: "seo defects", body: "ranked by how much they cost you in search, with the fix for each" },
+  { head: "who to sell to", body: "your ideal customer, worked out from your own pages" },
+  { head: "first moves", body: "fixes, leads and posts to start on this week" },
+];
 
-function Steps({ current }: { current: number }) {
+export default function StartPage({ searchParams }: { searchParams: { error?: string; website?: string } }) {
+  const signedIn = Boolean(currentUser());
   return (
-    <ol className="mb-10 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-      {STEPS.map((label, i) => (
-        <li key={label} className={`flex items-center gap-2 ${i + 1 === current ? "text-ink" : "text-mute"}`}>
-          <span
-            className={`tnum flex h-6 w-6 items-center justify-center rounded-full border text-caption ${
-              i + 1 === current ? "border-ink bg-ink text-paper" : "border-line"
-            }`}
-          >
-            {i + 1}
-          </span>
-          {label}
-        </li>
-      ))}
-    </ol>
-  );
-}
+    <div className="flex min-h-screen flex-col">
+      <header className="flex min-h-14 items-center gap-4 border-b border-dashed border-line px-6">
+        <Link href="/" className="font-mono text-[15px] tracking-[0.26em] text-ink">
+          emory
+        </Link>
+        <span className="font-mono text-xs">by xsentry labs</span>
+        <div className="flex-1" />
+        <Link href={signedIn ? "/today" : "/login"} className="font-mono text-[13px] hover:text-ink">
+          {signedIn ? "back to today" : "sign in"}
+        </Link>
+      </header>
 
-export default function StartPage({
-  searchParams,
-}: {
-  searchParams: { step?: string; website?: string; error?: string };
-}) {
-  const step = searchParams.step === "2" ? 2 : 1;
-  const website = searchParams.website ?? "";
-  const ready = isLlmConfigured();
-
-  return (
-    <div className="mx-auto max-w-2xl px-4 py-10">
-      <Steps current={step} />
-      {!ready ? (
-        <p className="mb-6 rounded-md border border-line bg-wash px-4 py-3 text-sm">
-          Set <code>OPENROUTER_API_KEY</code> on the server to turn on lead finding, scoring and outreach.
+      <main className="flex max-w-[860px] flex-1 flex-col gap-[26px] px-6 py-16 md:px-14 md:py-[72px]">
+        <span className="font-mono text-sm tracking-[0.12em]">001</span>
+        <h1 className="text-[34px] font-semibold leading-[1.15] md:text-[44px]">
+          your website in.
+          <br />a growth plan out.
+        </h1>
+        <p className="max-w-[560px] text-lg">
+          emory reads your site, finds what&apos;s hurting search, and works out who you should be selling to. free, about two minutes, no
+          signup.
         </p>
-      ) : null}
-      {searchParams.error ? (
-        <p role="alert" className="mb-6 rounded-md border border-danger/30 px-4 py-3 text-sm text-danger">
-          {searchParams.error}
-        </p>
-      ) : null}
-
-      {step === 1 ? (
-        <form action={submitWebsite} className="space-y-6">
-          <div>
-            <h1 className="font-display text-display font-medium">Find your next customers.</h1>
-            <p className="mt-3 text-lead text-mute">
-              Enter your website. We&apos;ll learn what you sell, find people who need it, rank them, and write the outreach.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="website">Your website</Label>
-            <Input id="website" name="website" placeholder="yourcompany.com" autoFocus className="h-12 text-body" />
-          </div>
-          <SubmitButton pendingLabel="One moment...">Continue</SubmitButton>
-          <p className="text-sm text-mute">
-            No website yet?{" "}
-            <a className="underline" href="/start?step=2">
-              Describe your service instead
-            </a>
-            .
+        {searchParams.error ? (
+          <p role="alert" className="max-w-[680px] border border-dashed border-danger/60 px-4 py-3 text-sm text-danger">
+            {searchParams.error}
           </p>
+        ) : null}
+        <form action={startReportAction} aria-label="Audit a website" className="flex max-w-[680px] flex-wrap gap-2.5">
+          <label htmlFor="website" className="sr-only">
+            Website address
+          </label>
+          <input
+            id="website"
+            name="website"
+            required
+            autoFocus
+            maxLength={300}
+            defaultValue={searchParams.website ?? ""}
+            placeholder="yourcompany.com"
+            className="h-12 min-w-0 flex-[1_1_320px] border border-ink bg-field px-4 font-mono text-[17px] text-ink placeholder:text-mute"
+          />
+          <SubmitButton pendingLabel="starting...">audit my site</SubmitButton>
         </form>
-      ) : (
-        <form action={submitBusiness} className="space-y-6">
-          <input type="hidden" name="website" value={website} />
-          <div>
-            <h1 className="font-display text-display font-medium">Tell us about your service.</h1>
-            <p className="mt-3 text-lead text-mute">
-              The more we know, the better the leads and the sharper the outreach.
-              {website ? ` We'll also read ${website}.` : ""}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="description">What you do, and who it&apos;s for</Label>
-            <DescriptionField id="description" name="description" />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="docs">Company documents (optional)</Label>
-            <input
-              id="docs"
-              name="docs"
-              type="file"
-              multiple
-              accept=".pdf,.txt,.md,.csv,.html,.htm"
-              className="block w-full text-sm file:mr-3 file:rounded-md file:border file:border-line file:bg-paper file:px-3 file:py-1.5 file:text-sm"
-            />
-            <p className="text-caption text-mute">Decks, one-pagers, case studies. PDF, TXT, MD, CSV or HTML; up to 5 files, 5 MB each.</p>
-          </div>
-          <SubmitButton pendingLabel="Reading your business...">Find my leads</SubmitButton>
-        </form>
-      )}
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(200px,100%),1fr))] gap-3 pt-3">
+          {GETS.map((g) => (
+            <div key={g.head} className="flex flex-col gap-1 border border-dashed border-line p-4">
+              <span className="font-mono text-ink">{g.head}</span>
+              <span className="text-[13px]">{g.body}</span>
+            </div>
+          ))}
+        </div>
+      </main>
     </div>
   );
 }

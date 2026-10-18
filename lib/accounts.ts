@@ -22,6 +22,23 @@ const MIGRATIONS: string[] = [
     created_at INTEGER NOT NULL
   );
   `,
+  `
+  -- Site reports run before anyone signs up. Shared across workspaces until claimed.
+  CREATE TABLE reports (
+    id TEXT PRIMARY KEY,
+    site TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('running','done','error')),
+    progress_json TEXT NOT NULL DEFAULT '{}',
+    report_json TEXT NOT NULL DEFAULT '',
+    guess_json TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    client TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    finished_at INTEGER,
+    claimed_workspace_id INTEGER REFERENCES workspaces(id)
+  );
+  CREATE INDEX reports_created ON reports(created_at);
+  `,
 ];
 
 export function openAccountsDb(file: string): DB {

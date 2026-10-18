@@ -1,6 +1,7 @@
 import { ArrowRight, Lock, PenLine, Search, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { startReportAction } from "@/app/report-actions";
 import { Faq, type FaqItem } from "@/components/site/faq";
 import { PlanCards } from "@/components/site/plan-cards";
 import { Button } from "@/components/ui/button";
@@ -48,7 +49,7 @@ const FAQ: FaqItem[] = [
 
 export default function Landing() {
   const user = currentUser();
-  if (user) redirect(getBusiness(getDb()).onboardedAt ? "/plays" : "/start");
+  if (user) redirect(getBusiness(getDb()).onboardedAt ? "/today" : "/start");
 
   const signal = PLAYS.filter((p) => !p.locked);
   return (
@@ -56,24 +57,25 @@ export default function Landing() {
       {/* Hero */}
       <section className="mx-auto max-w-shell px-4 pb-16 pt-16 md:px-8 md:pt-24">
         <div className="mx-auto max-w-3xl text-center">
-          <h1 className="font-display text-hero font-medium">Find buyers who need you right now.</h1>
+          <h1 className="font-display text-hero font-medium">your website in. a growth plan out.</h1>
           <p className="mx-auto mt-5 max-w-2xl text-lead text-mute">
-            Emory researches companies with a real reason to talk to you, shows you the proof, and drafts the message. You approve every email. Then it helps
-            you get found, with SEO fixes and content.
+            Emory reads your site, finds what&apos;s hurting search, works out who you should be selling to, and drafts the outreach. You approve
+            everything that goes out.
           </p>
-          <form action="/signup" method="get" className="mx-auto mt-8 flex max-w-xl flex-col gap-2 sm:flex-row">
+          <form action={startReportAction} className="mx-auto mt-8 flex max-w-xl flex-col gap-2 sm:flex-row">
             <Input
               name="website"
               placeholder="yourcompany.com"
               aria-label="Your website"
               className="h-12 flex-1 text-body"
               autoComplete="url"
+              required
             />
             <Button type="submit" size="lg" className="h-12">
-              Find my leads <ArrowRight />
+              Audit my site <ArrowRight />
             </Button>
           </form>
-          <p className="mt-3 text-caption text-mute">Free plan. No card needed. Early access is by invite.</p>
+          <p className="mt-3 text-caption text-mute">Free report in about two minutes. No signup needed to see it.</p>
         </div>
 
         {/* Product mock: clearly an example */}
@@ -221,8 +223,8 @@ export default function Landing() {
       <section className="border-t border-line bg-ink py-16 text-paper">
         <div className="mx-auto max-w-3xl px-4 text-center md:px-8">
           <h2 className="font-display text-section font-medium">See who is ready to talk to you.</h2>
-          <Link href="/signup" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "mt-6 text-ink")}>
-            Start free
+          <Link href="/start" className={cn(buttonVariants({ size: "lg", variant: "outline" }), "mt-6 text-ink")}>
+            Get my free report
           </Link>
         </div>
       </section>

@@ -3,12 +3,35 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --ink: #0d0d0f;
-    --paper: #ffffff;
-    --wash: #f7f8f9;
-    --line: #e6e9ec;
-    --mute: #6f7883;
+  /* Dark is the default; light is opt-in via data-theme="light" on <html>. */
+  :root,
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #adadae;
+    --paper: #1b1b1c;
+    --wash: #222224;
+    --field: #161617;
+    --line: #3b3b3d;
+    --line-soft: #2c2c2e;
+    --mute: #8a8a8c;
+    --accent: #8fa8e8;
+    --accent-ink: #1b1b1c;
+    --accent-wash: #1e2230;
+    --danger: #e8a08f;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --ink: #1b1b1c;
+    --paper: #fafafa;
+    --wash: #f0f0f1;
+    --field: #ffffff;
+    --line: #c9c9cc;
+    --line-soft: #e2e2e4;
+    --mute: #5c5c5f;
+    --accent: #3d5bb8;
+    --accent-ink: #ffffff;
+    --accent-wash: #eef1fb;
+    --danger: #a3271a;
   }
 
   * {
@@ -20,7 +43,7 @@
   }
 
   body {
-    @apply bg-paper font-sans text-body text-ink antialiased;
+    @apply bg-paper font-sans text-body text-mute antialiased;
   }
 
   /* Numbers in product surfaces are always tabular. */
@@ -31,7 +54,13 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-ink ring-offset-2 ring-offset-paper;
+    @apply outline-none ring-2 ring-accent ring-offset-2 ring-offset-paper;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-mono text-ink;
   }
 
   ::selection {
@@ -52,13 +81,35 @@
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #d3d8dd;
+    background: var(--mute);
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-lg border border-line bg-paper;
+    @apply border border-dashed border-line bg-paper;
+  }
+  .mono {
+    @apply font-mono;
+  }
+  /* Canvas-style buttons: dashed outline, solid accent for the primary action. */
+  .btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap border border-dashed border-ink px-4 font-mono text-[13px] tracking-[0.04em] text-ink transition-colors hover:bg-ink/10 disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply border-solid border-accent bg-accent font-semibold text-accent-ink hover:bg-accent/90;
+  }
+  .btn-quiet {
+    @apply border-line;
+  }
+  .btn-sm {
+    @apply h-8 px-2.5 text-xs;
+  }
+  .chip {
+    @apply inline-flex h-[30px] items-center border border-line px-2.5 font-mono text-xs text-mute;
+  }
+  .tag {
+    @apply font-mono text-xs tracking-[0.08em] text-mute;
   }
   .measure {
     @apply max-w-measure;
