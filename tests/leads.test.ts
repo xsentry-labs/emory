@@ -44,7 +44,8 @@ const PARSE = { keywords: ["warehousing", "3pl"], locations: ["united kingdom"],
 describe("migration", () => {
   it("gives every existing lead an account and keeps typed emails usable", () => {
     const db = new Database(":memory:");
-    migrate(db, SCHEMA_VERSION() - 1);
+    // The accounts migration is the second-to-last one; stop just before it.
+    migrate(db, SCHEMA_VERSION() - 2);
     const t = Date.now();
     const ins = db.prepare(`INSERT INTO prospects (name, company, email, website, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`);
     ins.run("Dan", "Harrow", "dan@harrow.co", "https://harrow.co", t, t);

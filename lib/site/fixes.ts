@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logEvent } from "../audit";
 import type { DB } from "../db";
 import {
   githubAppConfig,
@@ -246,6 +247,7 @@ export async function createFixPr(db: DB, llm: StructuredLlm, repo: RepoAccess, 
         db.prepare(`UPDATE site_issues SET status = 'in_pr', pr_id = ? WHERE id = ?`).run(prId, issue.id);
       }
     })();
+    logEvent(db, { track: "site", action: `opened PR #${pr.number}`, target: `${repo.repo} · ${draft.edits.length} file${draft.edits.length === 1 ? "" : "s"}`, approvedBy: "waiting for a person to merge" });
     return { prId, skipped: draft.skipped };
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : "Couldn't open the pull request.";
@@ -267,6 +269,7 @@ export function applyPrState(db: DB, prId: number, state: PrState, at = Date.now
     );
     if (state.state === "closed") db.prepare(`UPDATE site_issues SET status = 'open', pr_id = NULL WHERE pr_id = ? AND status = 'in_pr'`).run(prId);
   })();
+  if (state.state !== "open") logEvent(db, { track: "site", action: `PR #${pr.number} ${state.state}`, target: pr.repo, approvedBy: state.state === "merged" ? "merged by a person on github" : "" });
   if (state.state === "merged") {
     // Give the customer's deploy time to go out before checking.
     db.prepare(`INSERT INTO kv (key, value) VALUES ('recrawl_after', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(

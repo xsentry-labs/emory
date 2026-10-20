@@ -1,4 +1,6 @@
 import type { DB } from "./db";
+import { logEvent } from "./audit";
+import { isOptOut, isSuppressed, suppress } from "./suppress";
 import { scoreLead, type Qualification } from "./qualify";
 import type { Message, MessageKind, Profile, Prospect, ProspectStatus } from "./types";
 
@@ -273,6 +275,13 @@ export function logReply(db: DB, prospectId: number, body: string, messageId = "
     db.prepare(
       `UPDATE prospects SET status = 'replied', next_followup_at = NULL, updated_at = ? WHERE id = ?`,
     ).run(t, prospectId);
+    const p = getProspect(db, prospectId);
+    logEvent(db, { track: "leads", action: "logged reply", target: p ? `${p.name}${p.company ? ` · ${p.company}` : ""}` : "" });
+    // "Unsubscribe", "remove me": stop for good, everywhere.
+    if (p && isOptOut(body)) {
+      db.prepare(`UPDATE prospects SET status = 'lost', updated_at = ? WHERE id = ?`).run(t, prospectId);
+      if (p.email) suppress(db, "email", p.email, `opted out in a reply from ${p.name}`);
+    }
   })();
 }
 
@@ -289,7 +298,14 @@ export function queueDueFollowups(db: DB, at = now()): number {
          AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.prospect_id = p.id AND m.status = 'draft')`,
     )
     .all(at) as Prospect[];
+  let created = 0;
   for (const p of due) {
+    if (isSuppressed(db, p.email, p.website)) {
+      // Do not contact: stop the clock for good rather than checking again every tick.
+      db.prepare(`UPDATE prospects SET next_followup_at = NULL WHERE id = ?`).run(p.id);
+      continue;
+    }
+    created++;
     db.transaction(() => {
       createDraft(db, {
         prospectId: p.id,
@@ -300,5 +316,5 @@ export function queueDueFollowups(db: DB, at = now()): number {
       db.prepare(`UPDATE prospects SET next_followup_at = NULL WHERE id = ?`).run(p.id);
     })();
   }
-  return due.length;
+  return created;
 }

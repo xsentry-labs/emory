@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { memoryPrompt } from "./memory";
 import type { DB } from "./db";
 import type { StructuredLlm } from "./llm";
 import { getBusiness, getProfile } from "./repo";
@@ -70,6 +71,7 @@ function businessContext(db: DB): string {
   return [
     `<offer>\n${p.offer}\n</offer>`,
     `<ideal_customer>\n${p.icp}\n</ideal_customer>`,
+    memoryPrompt(db),
     b.context ? `<business_material>\n${b.context.slice(0, 12_000)}\n</business_material>` : "",
   ]
     .filter(Boolean)

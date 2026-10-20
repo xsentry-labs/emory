@@ -39,8 +39,8 @@ function items(p: SidebarProps): Item[] {
     { href: "/content", label: "social" },
     { href: "/approvals", label: "inbox", badge: p.pending },
     { href: "/site/results", label: "results" },
-    { href: "/profile", label: "memory" },
-    { href: "/audit", label: "audit", soon: true },
+    { href: "/memory", label: "memory" },
+    { href: "/audit", label: "audit" },
     ...(p.isAdmin ? [{ href: "/admin", label: "admin" }] : []),
   ];
 }

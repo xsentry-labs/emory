@@ -4,13 +4,14 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { apolloKey } from "@/lib/integrations/apollo";
-import { setAccountStatus } from "@/lib/leads/accounts";
+import { getAccount, setAccountStatus } from "@/lib/leads/accounts";
 import { approveApproach, finishStep, proposeApproach, setApproachStatus } from "@/lib/leads/approach";
 import { findCompanies, getFindState } from "@/lib/leads/find";
 import { BUYING_ROLES, enrichPeople, inferOrgChart, mapPeople, setBuyingRole, setReportsTo } from "@/lib/leads/people";
 import { isLlmConfigured, openRouterLlm, openRouterSearch } from "@/lib/llm";
 import { startPipeline } from "@/lib/pipeline";
-import { getDb } from "@/lib/request-db";
+import { logEvent } from "@/lib/audit";
+import { actorEmail, getDb } from "@/lib/request-db";
 import { consume } from "@/lib/usage";
 
 const id = z.coerce.number().int().positive();
@@ -73,7 +74,9 @@ export async function enrichAction(formData: FormData) {
     const key = apolloKey();
     if (!key) throw new Error("Set APOLLO_API_KEY to look up emails.");
     if (people.length === 0) throw new Error("Tick at least one person.");
-    const r = await enrichPeople(getDb(), key, people);
+    const db = getDb();
+    const r = await enrichPeople(db, key, people);
+    logEvent(db, { actor: actorEmail(), track: "leads", action: "approved email lookups", target: `${people.length} people · apollo credits` });
     target = `${back}${back.includes("?") ? "&" : "?"}verified=${r.verified}&guessed=${r.guessed}&missing=${r.unavailable}`;
   } catch (err) {
     target = `${back}${back.includes("?") ? "&" : "?"}error=${msg(err, "Lookup failed.")}`;
@@ -126,7 +129,9 @@ export async function proposeAction(formData: FormData) {
 
 export async function approveApproachAction(formData: FormData) {
   const input = z.object({ approach: id, account: id }).parse(Object.fromEntries(formData));
-  approveApproach(getDb(), input.approach);
+  const db = getDb();
+  approveApproach(db, input.approach);
+  logEvent(db, { actor: actorEmail(), track: "leads", action: "approved approach plan", target: getAccount(db, input.account)?.name ?? "" });
   revalidatePath("/", "layout");
   redirect(`/accounts/${input.account}/approach?approved=1`);
 }

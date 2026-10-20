@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
-import { currentUser, getDb } from "@/lib/request-db";
+import { logEvent } from "@/lib/audit";
+import { learnFromEdit } from "@/lib/memory";
+import { actorEmail, currentUser, getDb } from "@/lib/request-db";
 import {
   createDraft,
   createProspect,
@@ -74,7 +76,25 @@ export async function decide(formData: FormData) {
       body: text(10000).min(1),
     })
     .parse(Object.fromEntries(formData));
-  decideDraft(getDb(), input.id, input.decision, { subject: input.subject, body: input.body });
+  const db = getDb();
+  const before = db.prepare(`SELECT m.body, p.name FROM messages m JOIN prospects p ON p.id = m.prospect_id WHERE m.id = ? AND m.status = 'draft'`).get(input.id) as
+    | { body: string; name: string }
+    | undefined;
+  if (decideDraft(db, input.id, input.decision, { subject: input.subject, body: input.body }) && before) {
+    const edited = before.body.trim() !== input.body.trim();
+    logEvent(db, {
+      actor: actorEmail(),
+      track: "leads",
+      action: `${input.decision === "approved" ? "approved" : "skipped"} email${edited ? " (edited)" : ""}`,
+      target: `${before.name} · ${input.subject}`,
+    });
+    // Learn a voice rule from the edit, in the background; it never blocks the decision.
+    if (edited && input.decision === "approved" && isLlmConfigured()) {
+      void learnFromEdit(db, openRouterLlm, before.body, input.body, `from your edit to ${before.name}'s email`).catch((err) =>
+        console.error("[memory] couldn't learn from edit:", err instanceof Error ? err.message : err),
+      );
+    }
+  }
   revalidatePath("/approvals");
   revalidatePath("/today");
   revalidatePath("/prospects", "layout");
@@ -108,7 +128,8 @@ export async function qualify(formData: FormData) {
 export async function updateProfile(formData: FormData) {
   const input = z.object({ offer: text(3000), icp: text(3000) }).parse(Object.fromEntries(formData));
   saveProfile(getDb(), input);
-  revalidatePath("/profile");
+  logEvent(getDb(), { actor: actorEmail(), track: "account", action: "edited brand profile" });
+  revalidatePath("/memory");
 }
 
 export async function generateDraft(formData: FormData) {

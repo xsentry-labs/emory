@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logEvent } from "../audit";
 import type { DB } from "../db";
 import { revealEmail, searchPeople } from "../integrations/apollo";
 import type { Fetch } from "../integrations/github";
@@ -169,5 +170,6 @@ export async function enrichPeople(db: DB, key: string, ids: number[], f: Fetch 
     out[r.status]++;
   }
   out.skipped += todo.length - room;
+  logEvent(db, { track: "leads", action: "looked up emails", target: `apollo · ${out.verified} verified, ${out.guessed} risky, ${out.unavailable} not found`, at });
   return out;
 }

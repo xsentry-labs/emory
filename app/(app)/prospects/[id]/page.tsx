@@ -1,3 +1,5 @@
+import { deletePersonAction } from "@/app/govern-actions";
+import { personRecord } from "@/lib/privacy";
 import { notFound } from "next/navigation";
 import { addDraft, addReply, changeStatus, generateDraft, qualify, research, saveContact } from "@/app/actions";
 import { PageHead } from "@/components/page-head";
@@ -236,6 +238,36 @@ export default function ProspectPage({
           </Button>
         </form>
       </div>
+
+      <section aria-labelledby="record" className="mt-10 grid gap-6 border-t border-dashed border-line pt-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex flex-col gap-2">
+          <h2 id="record" className="text-base font-semibold">
+            data emory holds on {prospect.name.toLowerCase()}
+          </h2>
+          <dl>
+            {personRecord(prospect).map((r) => (
+              <div key={r.field} className="grid grid-cols-[90px_minmax(0,1fr)_minmax(0,200px)] gap-3 border-t border-dashed border-line-soft py-2 text-[13px] last:border-b">
+                <dt className="font-mono">{r.field}</dt>
+                <dd className="break-words text-ink">{r.value}</dd>
+                <dd className="break-words font-mono text-xs">{r.source || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+          <span className="text-xs">added {new Date(prospect.created_at).toISOString().slice(0, 10)} · business contact details only</span>
+        </div>
+        <form action={deletePersonAction} className="flex flex-col gap-2 border border-dashed border-danger/60 p-4">
+          <input type="hidden" name="id" value={prospect.id} />
+          <span className="font-mono text-xs text-danger">delete on request</span>
+          <span className="text-[13px]">removes their record, messages and plans. their address stays on do-not-contact so they aren&apos;t found again.</span>
+          <label htmlFor="confirm" className="font-mono text-xs">
+            type delete to confirm
+          </label>
+          <input id="confirm" name="confirm" autoComplete="off" required className="h-9 border border-line bg-field px-2 font-mono text-sm text-ink" />
+          <button type="submit" className="btn self-start border-danger/60 text-danger hover:bg-danger/10">
+            delete {prospect.name.toLowerCase()}
+          </button>
+        </form>
+      </section>
     </>
   );
 }

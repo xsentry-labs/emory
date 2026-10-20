@@ -1,4 +1,6 @@
 import type { DB } from "./db";
+import { logEvent } from "./audit";
+import { isSuppressed } from "./suppress";
 import { fromHeader, type Mailer, type SendConfig } from "./mailer";
 import type { Message, Prospect } from "./types";
 
@@ -50,6 +52,11 @@ export async function sendApproved(
       failed++;
       continue;
     }
+    if (isSuppressed(db, m.email)) {
+      giveUp(m.id, "Not sent: this address is on the do-not-contact list.");
+      failed++;
+      continue;
+    }
     // Guessed or unavailable addresses bounce and hurt the sender's reputation; never send to them.
     if (m.email_status === "guessed" || m.email_status === "unavailable") {
       giveUp(m.id, "Not sent: this email isn't verified. Verify it or enter one you know.");
@@ -85,6 +92,7 @@ export async function sendApproved(
       db.prepare(
         `UPDATE messages SET status = 'sent', sent_at = ?, message_id = ?, send_error = '' WHERE id = ?`,
       ).run(Date.now(), messageId, m.id);
+      logEvent(db, { track: "leads", action: m.kind === "followup" ? "sent follow-up" : "sent email", target: `${m.email.trim()} · ${m.subject}`, approvedBy: "a person, in emory" });
       sent++;
     } catch (err) {
       db.prepare(`UPDATE messages SET send_error = ? WHERE id = ?`).run(

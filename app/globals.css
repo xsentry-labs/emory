@@ -139,3 +139,70 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Org chart (components/leads/org-chart.tsx). Each card draws its half of the
+   bar above it plus its own drop line, so the bar ends exactly at the outer
+   cards' centres. .guess marks a reporting line that is only a guess (dashed). */
+@layer components {
+  .org ul {
+    @apply relative flex justify-center pt-6;
+  }
+  .org ul::before {
+    content: "";
+    @apply absolute left-1/2 top-0 h-6 border-l-2 border-mute;
+  }
+  .org ul.guess::before {
+    border-left-style: dashed;
+  }
+  .org li {
+    @apply relative flex flex-col items-center px-2 pt-6;
+  }
+  .org li::before,
+  .org li::after {
+    content: "";
+    @apply absolute top-0 h-6 w-1/2 border-t-2 border-mute;
+  }
+  .org li::before {
+    right: 50%;
+  }
+  .org li::after {
+    left: 50%;
+    @apply border-l-2;
+  }
+  .org li.guess::after {
+    border-left-style: dashed;
+  }
+  .org li:first-child::before,
+  .org li:last-child::after {
+    border-top: 0;
+  }
+  .org li:last-child::before {
+    @apply border-r-2;
+  }
+  .org li.guess:last-child::before {
+    border-right-style: dashed;
+  }
+  .org li:last-child::after {
+    border-left: 0;
+  }
+  /* An only child hangs straight from the parent's drop line. */
+  .org li:only-child {
+    @apply pt-0;
+  }
+  .org li:only-child::before,
+  .org li:only-child::after {
+    display: none;
+  }
+  /* Top level: no lines above the roots. */
+  .org > ul {
+    @apply gap-6 pt-0;
+  }
+  .org > ul::before,
+  .org > ul > li::before,
+  .org > ul > li::after {
+    display: none;
+  }
+  .org > ul > li {
+    @apply pt-0;
+  }
+}

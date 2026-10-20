@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { logEvent } from "../audit";
+import { isSuppressed } from "../suppress";
 import type { DB } from "../db";
 import { draftMessage } from "../draft";
 import type { StructuredLlm } from "../llm";
@@ -225,6 +227,10 @@ export async function runDueSteps(db: DB, llm: StructuredLlm | null, at = Date.n
     const next = remaining.find((s) => s.channel === "email" && (s.due_at ?? Infinity) <= at);
     if (!next) continue;
     const person = people.get(next.prospect_id);
+    if (person && isSuppressed(db, person.email, person.website)) {
+      db.prepare(`UPDATE approach_steps SET status = 'skipped', summary = summary || ' (skipped: do not contact)' WHERE id = ?`).run(next.id);
+      continue;
+    }
     if (!person || !canEmail(person)) {
       db.prepare(`UPDATE approach_steps SET status = 'skipped', summary = summary || ' (skipped: no verified email)' WHERE id = ?`).run(next.id);
       continue;
@@ -232,6 +238,7 @@ export async function runDueSteps(db: DB, llm: StructuredLlm | null, at = Date.n
     const earlier = listMessages(db, person.id).some((m) => m.direction === "outbound" && m.status !== "rejected");
     const messageId = await draftMessage(db, llm, person.id, earlier ? "followup" : "outreach", `Angle: ${next.angle}\nThis email: ${next.summary}`);
     db.prepare(`UPDATE approach_steps SET status = 'drafted', message_id = ? WHERE id = ?`).run(messageId, next.id);
+    logEvent(db, { track: "leads", action: "drafted planned email", target: `${person.name} · ${next.summary}` });
     drafted++;
   }
   return drafted;

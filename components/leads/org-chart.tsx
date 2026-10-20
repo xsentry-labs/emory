@@ -4,28 +4,28 @@ import { canEmail } from "@/lib/leads/people";
 import { cn } from "@/lib/utils";
 
 /**
- * Org chart as nested lists: each person's card, then their reports in a row
- * below. A guessed reporting line is drawn dashed; a confirmed one solid.
- * Cards carry a checkbox (name="person") so the chart can sit in a form.
+ * Org chart as nested lists, connectors drawn in CSS (`.org` in globals.css).
+ * A guessed reporting line is dashed; a confirmed one solid. Cards carry a
+ * checkbox (name="person") so the chart can sit inside a form.
  */
 export function OrgChart({ roots, accountId, selected, picked }: { roots: ChartNode[]; accountId: number; selected: number | null; picked: Set<number> }) {
   return (
-    <ul className="flex min-w-max justify-center gap-6 p-6">
-      {roots.map((n) => (
-        <Node key={n.person.id} node={n} accountId={accountId} selected={selected} picked={picked} />
-      ))}
-    </ul>
+    <div className="org min-w-max p-6">
+      <ul>
+        {roots.map((n) => (
+          <Node key={n.person.id} node={n} accountId={accountId} selected={selected} picked={picked} />
+        ))}
+      </ul>
+    </div>
   );
 }
 
 function Node({ node, accountId, selected, picked }: { node: ChartNode; accountId: number; selected: number | null; picked: Set<number> }) {
   const p = node.person;
   const replied = ["replied", "meeting", "won"].includes(p.status);
+  const onlyChildGuess = node.children.length === 1 && !node.children[0].person.reports_verified;
   return (
-    <li className="flex flex-col items-center">
-      {p.reports_to !== null ? (
-        <span aria-hidden className={cn("h-6 border-l-2", p.reports_verified ? "border-solid border-mute" : "border-dashed border-mute")} />
-      ) : null}
+    <li className={cn(p.reports_to !== null && !p.reports_verified && "guess")}>
       <div
         className={cn(
           "relative flex w-[220px] flex-col gap-0.5 border bg-wash px-3 py-2 text-xs has-[:checked]:border-2 has-[:checked]:border-accent has-[:checked]:bg-accent-wash",
@@ -47,14 +47,11 @@ function Node({ node, accountId, selected, picked }: { node: ChartNode; accountI
         {p.buying_role ? <span className="mt-0.5 self-start border border-mute px-1.5 font-mono text-[10px] tracking-[0.08em] text-ink">{p.buying_role}</span> : null}
       </div>
       {node.children.length ? (
-        <>
-          <span aria-hidden className="h-6 border-l-2 border-mute" />
-          <ul className="flex gap-4 border-t-2 border-mute">
-            {node.children.map((c) => (
-              <Node key={c.person.id} node={c} accountId={accountId} selected={selected} picked={picked} />
-            ))}
-          </ul>
-        </>
+        <ul className={cn(onlyChildGuess && "guess")}>
+          {node.children.map((c) => (
+            <Node key={c.person.id} node={c} accountId={accountId} selected={selected} picked={picked} />
+          ))}
+        </ul>
       ) : null}
     </li>
   );

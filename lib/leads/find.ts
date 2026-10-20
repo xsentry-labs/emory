@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { logEvent } from "../audit";
+import { isSuppressed } from "../suppress";
 import { z } from "zod";
 import type { DB } from "../db";
 import { getKv, setKv } from "../inbound";
@@ -126,7 +128,7 @@ export async function findCompanies(db: DB, llm: StructuredLlm, key: string, tex
 
   const known = (c: ApolloCompany) =>
     db.prepare(`SELECT 1 FROM accounts WHERE apollo_id = ? OR (domain <> '' AND domain = ?)`).get(c.apolloId, c.domain || domainOf(c.website));
-  const fresh = companies.filter((c) => !known(c)).slice(0, room);
+  const fresh = companies.filter((c) => !known(c) && !isSuppressed(db, "", c.domain || c.website)).slice(0, room);
   const duplicates = companies.length - fresh.length;
   if (fresh.length === 0) return { added: 0, dropped: 0, duplicates, total };
 
@@ -147,5 +149,6 @@ export async function findCompanies(db: DB, llm: StructuredLlm, key: string, tex
     }
   })();
   recordUsage(db, "leads", fresh.length, at);
+  logEvent(db, { track: "leads", action: "found companies", target: `${fresh.length} from apollo · ${dropped} dropped as poor fit`, at });
   return { added: fresh.length - dropped, dropped, duplicates, total };
 }

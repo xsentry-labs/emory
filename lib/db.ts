@@ -235,6 +235,41 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX approach_steps_due ON approach_steps(status, due_at);
   `,
+  `
+  -- Append-only record of everything Emory did and every decision a person made.
+  CREATE TABLE audit_log (
+    id INTEGER PRIMARY KEY,
+    at INTEGER NOT NULL,
+    actor TEXT NOT NULL,            -- 'emory' or the person's email
+    track TEXT NOT NULL CHECK (track IN ('site','leads','social','account')),
+    action TEXT NOT NULL,
+    target TEXT NOT NULL DEFAULT '',
+    approved_by TEXT NOT NULL DEFAULT ''
+  );
+  CREATE INDEX audit_at ON audit_log(at);
+  CREATE TRIGGER audit_no_update BEFORE UPDATE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit log is append-only'); END;
+  CREATE TRIGGER audit_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit log is append-only'); END;
+
+  -- Do not contact: an email address or a whole domain. Checked before drafting, sending and adding people.
+  CREATE TABLE suppressions (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('email','domain')),
+    value TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    UNIQUE (kind, value)
+  );
+
+  -- What every writer reads first: voice rules, proof points, what worked, the call to action.
+  CREATE TABLE memory (
+    id INTEGER PRIMARY KEY,
+    kind TEXT NOT NULL CHECK (kind IN ('voice','proof','worked','cta')),
+    text TEXT NOT NULL,
+    source TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  );
+  `,
 ];
 
 /** Bring the schema up to date (or up to `target`, for tests of a migration over existing data). */
