@@ -3,7 +3,9 @@ import { setWorkspacePlan } from "@/app/actions";
 import { PageHead } from "@/components/page-head";
 import { Button } from "@/components/ui/button";
 import { getAccount, getAccountsDb, listWorkspaceSummaries } from "@/lib/accounts";
+import { backupNow } from "@/app/actions";
 import { isAdminEmail } from "@/lib/admin";
+import { backupHealthy, backupStatus } from "@/lib/backup";
 import { getWorkspaceDb } from "@/lib/db";
 import { PLAN_LIST } from "@/lib/pricing";
 import { planOf, usedThisMonth } from "@/lib/quota";
@@ -16,6 +18,7 @@ export default function AdminPage() {
   const email = user ? getAccount(getAccountsDb(), user.userId)?.email : undefined;
   if (!isAdminEmail(email)) notFound();
 
+  const backup = backupStatus();
   const rows = listWorkspaceSummaries(getAccountsDb()).map((w) => {
     const db = getWorkspaceDb(w.id);
     return { ...w, plan: planOf(db), leads: usedThisMonth(db, "leads"), seo: usedThisMonth(db, "seo"), ai: usedThisMonth(db, "ai") };
@@ -24,6 +27,27 @@ export default function AdminPage() {
   return (
     <>
       <PageHead title="Admin" standfirst="Workspaces and their plans. Paid plans are set by hand during early access." />
+      <section aria-label="Backups" className="mb-8 flex flex-wrap items-center gap-4 border border-dashed border-line p-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="font-mono text-xs text-ink">backups</span>
+          <span className={backup.configured && backupHealthy() ? "text-sm" : "text-sm text-danger"}>
+            {!backup.configured
+              ? "OFF. Set BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY_ID and BACKUP_S3_SECRET_ACCESS_KEY. Losing the volume would lose every workspace."
+              : backup.lastError
+                ? `Last attempt failed: ${backup.lastError}`
+                : backup.lastOkAt
+                  ? `Last snapshot ${new Date(backup.lastOkAt).toISOString().slice(0, 16).replace("T", " ")} UTC (${backup.lastStamp})${backup.encrypted ? ", encrypted" : ", NOT encrypted: set BACKUP_ENCRYPTION_KEY"}.`
+                  : "Configured; the first snapshot runs a minute after start."}
+          </span>
+        </div>
+        {backup.configured ? (
+          <form action={backupNow}>
+            <button type="submit" className="btn btn-quiet h-9" disabled={backup.running}>
+              {backup.running ? "backing up…" : "back up now"}
+            </button>
+          </form>
+        ) : null}
+      </section>
       <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full min-w-[48rem] text-left text-sm">
           <thead className="border-b border-line bg-wash text-caption text-mute">

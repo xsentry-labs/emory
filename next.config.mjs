@@ -6,7 +6,7 @@ const nextConfig = {
   experimental: {
     instrumentationHook: true,
     serverActions: { bodySizeLimit: "30mb" },
-    serverComponentsExternalPackages: ["better-sqlite3"],
+    serverComponentsExternalPackages: ["better-sqlite3", "@aws-sdk/client-s3"],
   },
 };
 

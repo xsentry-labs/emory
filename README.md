@@ -60,6 +60,25 @@ Create one at GitHub → Settings → Developer settings → GitHub Apps → New
 
 In Google Cloud: enable the **Google Search Console API**, configure the OAuth consent screen with the scope `https://www.googleapis.com/auth/webmasters.readonly`, and create an **OAuth client ID** (web application) with the redirect URI `APP_URL/api/connect/google/callback`. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `APP_URL`. Optionally create an API key with the PageSpeed Insights API enabled and set `PAGESPEED_API_KEY`.
 
+## Backups
+
+Every workspace is its own SQLite file on the volume, so the volume is the whole business. With `BACKUP_S3_*` set, the app snapshots `accounts.db` and every `workspaces/*.db` every `BACKUP_INTERVAL_MINUTES` (default 60) using SQLite's online backup API (consistent while the app writes), gzips and encrypts each with AES-256-GCM (`BACKUP_ENCRYPTION_KEY`), and uploads them to `<prefix><timestamp>/` with a checksummed `manifest.json`. `latest.json` is written last, so it always names a complete snapshot. Snapshots older than `BACKUP_KEEP_DAYS` (default 14) are pruned; the newest is never deleted. Up to one interval of data can be lost.
+
+- Status and a "back up now" button are on `/admin`. `/api/health` reports `backups: "ok" | "stale"` without failing the health check.
+- **Restore** (stop the app first, e.g. scale to 0 or run in a one-off container with the volume mounted):
+  ```bash
+  DATA_DIR=/data BACKUP_S3_BUCKET=… BACKUP_S3_ACCESS_KEY_ID=… BACKUP_S3_SECRET_ACCESS_KEY=… \
+  BACKUP_S3_ENDPOINT=… BACKUP_ENCRYPTION_KEY=… node scripts/restore-backup.mjs [--stamp <timestamp>] [--force]
+  ```
+  It verifies every file's checksum and refuses to overwrite existing databases without `--force`.
+- **Test a restore** into an empty directory once after setting this up; a backup you've never restored isn't a backup.
+- Keep `BACKUP_ENCRYPTION_KEY` (and `SESSION_SECRET`, which decrypts stored connection tokens) in a password manager outside Railway.
+- Turn on versioning or object lock on the bucket if you can, so a leaked key can't delete history.
+
+## CI
+
+`.github/workflows/ci.yml` runs typecheck, lint, tests and `next build` on every pull request and push to `main`, and builds the Docker image Railway deploys.
+
 ## Limits
 
 - Lead sourcing quality depends on the model and its web search; always review new leads. Most sourced leads will have no public email, so add one before they can be emailed.
