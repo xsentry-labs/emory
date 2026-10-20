@@ -1,4 +1,6 @@
 import type { DB } from "./db";
+import { logEvent } from "./audit";
+import { isOptOut, isSuppressed, suppress } from "./suppress";
 import { scoreLead, type Qualification } from "./qualify";
 import type { Message, MessageKind, Profile, Prospect, ProspectStatus } from "./types";
 
@@ -18,16 +20,48 @@ export function createProspect(
     source?: string;
     source_url?: string;
     linkedin_url?: string;
+    title?: string;
+    seniority?: string;
+    apollo_id?: string;
+    /** Defaults to the account for this company (created if new). */
+    account_id?: number;
   },
 ): number {
   const t = now();
+  const row = { company: "", email: "", website: "", notes: "", source: "", source_url: "", linkedin_url: "", title: "", seniority: "", apollo_id: "", ...input, t };
+  const accountId = input.account_id ?? ensureAccount(db, { name: row.company || row.name, website: row.website, source: row.source });
   const r = db
     .prepare(
-      `INSERT INTO prospects (name, company, email, website, notes, source, source_url, linkedin_url, created_at, updated_at)
-       VALUES (@name, @company, @email, @website, @notes, @source, @source_url, @linkedin_url, @t, @t)`,
+      `INSERT INTO prospects (name, company, email, website, notes, source, source_url, linkedin_url, title, seniority, apollo_id,
+         email_status, account_id, created_at, updated_at)
+       VALUES (@name, @company, @email, @website, @notes, @source, @source_url, @linkedin_url, @title, @seniority, @apollo_id,
+         @email_status, @account_id, @t, @t)`,
     )
-    .run({ company: "", email: "", website: "", notes: "", source: "", source_url: "", linkedin_url: "", ...input, t });
+    .run({ ...row, email_status: row.email ? "manual" : "", account_id: accountId });
   return Number(r.lastInsertRowid);
+}
+
+export const domainOf = (website: string): string => {
+  try {
+    return new URL(/^https?:\/\//i.test(website) ? website : `https://${website}`).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+};
+
+/** The account for a company: matched by domain, then by name; created when there is none. */
+export function ensureAccount(db: DB, input: { name: string; website?: string; source?: string }): number {
+  const domain = input.website ? domainOf(input.website) : "";
+  const found = (domain
+    ? db.prepare(`SELECT id FROM accounts WHERE domain = ? LIMIT 1`).get(domain)
+    : undefined) ?? db.prepare(`SELECT id FROM accounts WHERE lower(name) = lower(?) LIMIT 1`).get(input.name.trim());
+  if (found) return (found as { id: number }).id;
+  const t = now();
+  return Number(
+    db
+      .prepare(`INSERT INTO accounts (name, website, domain, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+      .run(input.name.trim() || domain || "Unknown company", input.website ?? "", domain, input.source ?? "", t, t).lastInsertRowid,
+  );
 }
 
 export function listProspects(db: DB): (Prospect & { pending: number })[] {
@@ -200,7 +234,12 @@ export function updateContact(db: DB, id: number, input: { email: string; linked
   if (email && !isEmail(email)) throw new Error("That email address doesn't look valid.");
   const linkedin = cleanLinkedinUrl(input.linkedin_url);
   if (input.linkedin_url.trim() && !linkedin) throw new Error("Use a linkedin.com/in/... or linkedin.com/company/... link.");
-  db.prepare(`UPDATE prospects SET email = ?, linkedin_url = ?, updated_at = ? WHERE id = ?`).run(email, linkedin, now(), id);
+  // A hand-entered address is "manual"; clearing it resets the lookup state.
+  db.prepare(
+    `UPDATE prospects SET email_status = CASE WHEN email = @email THEN email_status WHEN @email = '' THEN '' ELSE 'manual' END,
+       email_source = CASE WHEN email = @email THEN email_source WHEN @email = '' THEN '' ELSE 'you' END,
+       email = @email, linkedin_url = @linkedin, updated_at = @t WHERE id = @id`,
+  ).run({ email, linkedin, t: now(), id });
 }
 
 export interface ReadyMessage extends Message {
@@ -236,6 +275,13 @@ export function logReply(db: DB, prospectId: number, body: string, messageId = "
     db.prepare(
       `UPDATE prospects SET status = 'replied', next_followup_at = NULL, updated_at = ? WHERE id = ?`,
     ).run(t, prospectId);
+    const p = getProspect(db, prospectId);
+    logEvent(db, { track: "leads", action: "logged reply", target: p ? `${p.name}${p.company ? ` · ${p.company}` : ""}` : "" });
+    // "Unsubscribe", "remove me": stop for good, everywhere.
+    if (p && isOptOut(body)) {
+      db.prepare(`UPDATE prospects SET status = 'lost', updated_at = ? WHERE id = ?`).run(t, prospectId);
+      if (p.email) suppress(db, "email", p.email, `opted out in a reply from ${p.name}`);
+    }
   })();
 }
 
@@ -252,7 +298,14 @@ export function queueDueFollowups(db: DB, at = now()): number {
          AND NOT EXISTS (SELECT 1 FROM messages m WHERE m.prospect_id = p.id AND m.status = 'draft')`,
     )
     .all(at) as Prospect[];
+  let created = 0;
   for (const p of due) {
+    if (isSuppressed(db, p.email, p.website)) {
+      // Do not contact: stop the clock for good rather than checking again every tick.
+      db.prepare(`UPDATE prospects SET next_followup_at = NULL WHERE id = ?`).run(p.id);
+      continue;
+    }
+    created++;
     db.transaction(() => {
       createDraft(db, {
         prospectId: p.id,
@@ -263,5 +316,5 @@ export function queueDueFollowups(db: DB, at = now()): number {
       db.prepare(`UPDATE prospects SET next_followup_at = NULL WHERE id = ?`).run(p.id);
     })();
   }
-  return due.length;
+  return created;
 }

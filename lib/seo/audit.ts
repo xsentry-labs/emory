@@ -1,4 +1,5 @@
 import type { DB } from "../db";
+import { logEvent } from "../audit";
 import type { StructuredLlm } from "../llm";
 import { charge } from "../quota";
 import { getBusiness, getProfile } from "../repo";
@@ -122,7 +123,8 @@ export async function runAudit(db: DB, id: number, site: string, deps: AuditDeps
     };
     db.transaction(() => {
       db.prepare(`UPDATE seo_audits SET status = 'done', report_json = ?, finished_at = ? WHERE id = ?`).run(JSON.stringify(report), Date.now(), id);
-      syncIssues(db, issues);
+      const { opened, fixed } = syncIssues(db, issues);
+      logEvent(db, { track: "site", action: "crawled site", target: `${site} · score ${score} · ${opened} new, ${fixed} fixed` });
     })();
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : "The audit failed.";

@@ -35,12 +35,12 @@ function items(p: SidebarProps): Item[] {
     { href: "/today", label: "today", badge: p.today },
     { href: "/site", label: "site", figure: p.siteScore === null ? undefined : String(p.siteScore) },
     { href: "/leads", label: "leads" },
-    { href: "/accounts", label: "accounts", soon: true },
+    { href: "/accounts", label: "accounts" },
     { href: "/content", label: "social" },
     { href: "/approvals", label: "inbox", badge: p.pending },
     { href: "/site/results", label: "results" },
-    { href: "/profile", label: "memory" },
-    { href: "/audit", label: "audit", soon: true },
+    { href: "/memory", label: "memory" },
+    { href: "/audit", label: "audit" },
     ...(p.isAdmin ? [{ href: "/admin", label: "admin" }] : []),
   ];
 }

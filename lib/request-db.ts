@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { getAccount, getAccountsDb } from "./accounts";
 import { getWorkspaceDb, type DB } from "./db";
 
 /** Headers set by middleware after it verifies the session cookie. Never trusted from the client. */
@@ -19,4 +20,11 @@ export function currentUser(): { userId: number; workspaceId: number } | null {
   return Number.isInteger(userId) && userId > 0 && Number.isInteger(workspaceId) && workspaceId > 0
     ? { userId, workspaceId }
     : null;
+}
+
+/** The signed-in person's email, for the audit log. */
+export function actorEmail(): string {
+  const u = currentUser();
+  if (!u) return "someone";
+  return getAccount(getAccountsDb(), u.userId)?.email ?? "someone";
 }

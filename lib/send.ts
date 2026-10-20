@@ -1,4 +1,6 @@
 import type { DB } from "./db";
+import { logEvent } from "./audit";
+import { isSuppressed } from "./suppress";
 import { fromHeader, type Mailer, type SendConfig } from "./mailer";
 import type { Message, Prospect } from "./types";
 
@@ -8,7 +10,7 @@ const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 // A follow-up must not go out once the lead has replied or the conversation is closed.
 const STOPPED = new Set(["replied", "meeting", "won", "lost"]);
 
-type Row = Message & { email: string; prospect_status: Prospect["status"] };
+type Row = Message & { email: string; email_status: Prospect["email_status"]; prospect_status: Prospect["status"] };
 
 /**
  * Send messages a human has approved. Rate-limited by a rolling 24h cap, retries
@@ -31,7 +33,7 @@ export async function sendApproved(
 
   const rows = db
     .prepare(
-      `SELECT m.*, p.email AS email, p.status AS prospect_status
+      `SELECT m.*, p.email AS email, p.email_status AS email_status, p.status AS prospect_status
        FROM messages m JOIN prospects p ON p.id = m.prospect_id
        WHERE m.status = 'approved' AND m.direction = 'outbound' AND m.send_attempts < ?
        ORDER BY m.decided_at, m.id LIMIT ?`,
@@ -47,6 +49,17 @@ export async function sendApproved(
   for (const m of rows) {
     if (!EMAIL_RE.test(m.email.trim())) {
       giveUp(m.id, "Lead has no valid email address.");
+      failed++;
+      continue;
+    }
+    if (isSuppressed(db, m.email)) {
+      giveUp(m.id, "Not sent: this address is on the do-not-contact list.");
+      failed++;
+      continue;
+    }
+    // Guessed or unavailable addresses bounce and hurt the sender's reputation; never send to them.
+    if (m.email_status === "guessed" || m.email_status === "unavailable") {
+      giveUp(m.id, "Not sent: this email isn't verified. Verify it or enter one you know.");
       failed++;
       continue;
     }
@@ -79,6 +92,7 @@ export async function sendApproved(
       db.prepare(
         `UPDATE messages SET status = 'sent', sent_at = ?, message_id = ?, send_error = '' WHERE id = ?`,
       ).run(Date.now(), messageId, m.id);
+      logEvent(db, { track: "leads", action: m.kind === "followup" ? "sent follow-up" : "sent email", target: `${m.email.trim()} · ${m.subject}`, approvedBy: "a person, in emory" });
       sent++;
     } catch (err) {
       db.prepare(`UPDATE messages SET send_error = ? WHERE id = ?`).run(

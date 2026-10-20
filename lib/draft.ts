@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { memoryPrompt } from "./memory";
+import { isSuppressed } from "./suppress";
 import type { DB } from "./db";
 import type { StructuredLlm } from "./llm";
 import { createDraft, getProfile, getProspect, listMessages } from "./repo";
@@ -23,9 +25,12 @@ export async function draftMessage(
   llm: StructuredLlm,
   prospectId: number,
   kind: "outreach" | "followup",
+  /** Extra direction from an approach plan: the angle and what this touch should do. */
+  brief = "",
 ): Promise<number> {
   const prospect = getProspect(db, prospectId);
   if (!prospect) throw new Error(`Lead ${prospectId} not found`);
+  if (isSuppressed(db, prospect.email, prospect.website)) throw new Error(`${prospect.name} is on the do-not-contact list.`);
   const profile = getProfile(db);
   if (!profile.offer.trim()) {
     throw new Error("Describe what you offer on the Offer & ICP page first.");
@@ -38,13 +43,16 @@ export async function draftMessage(
   const user = [
     `Write a ${kind === "followup" ? "follow-up" : "first outreach"} email.`,
     `<our_offer>\n${profile.offer}\n</our_offer>`,
+    memoryPrompt(db),
     `<ideal_customer>\n${profile.icp || "(not specified)"}\n</ideal_customer>`,
     `<recipient>`,
     `Name: ${prospect.name}`,
+    prospect.title ? `Title: ${prospect.title}` : "",
     `Company: ${prospect.company || "(unknown)"}`,
     `Website: ${prospect.website || "(unknown)"}`,
     `Research notes: ${prospect.notes || "(none)"}`,
     `</recipient>`,
+    brief ? `<plan_for_this_email>\n${brief}\n</plan_for_this_email>` : "",
     history ? `<conversation_so_far>\n${history}\n</conversation_so_far>` : "",
   ]
     .filter(Boolean)

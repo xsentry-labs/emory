@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { userCanAccessInstallation } from "@/lib/integrations/github";
 import { saveConnection } from "@/lib/integrations/store";
-import { currentUser, getDb } from "@/lib/request-db";
+import { logEvent } from "@/lib/audit";
+import { actorEmail, currentUser, getDb } from "@/lib/request-db";
 import { verifyState } from "@/lib/secrets";
 
 export const dynamic = "force-dynamic";
@@ -23,5 +24,6 @@ export async function GET(req: Request) {
     return back(err instanceof Error ? err.message : "GitHub check failed.");
   }
   saveConnection(getDb(), "github", { installationId });
+  logEvent(getDb(), { actor: actorEmail(), track: "account", action: "connected github", target: `installation ${installationId}` });
   return NextResponse.redirect(new URL("/site/settings?connected=github", req.url));
 }

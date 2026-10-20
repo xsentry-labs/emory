@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { exchangeCode, googleConfig } from "@/lib/integrations/google";
 import { removeConnection, saveConnection } from "@/lib/integrations/store";
-import { currentUser, getDb } from "@/lib/request-db";
+import { logEvent } from "@/lib/audit";
+import { actorEmail, currentUser, getDb } from "@/lib/request-db";
 import { verifyState } from "@/lib/secrets";
 import { syncSearchConsole } from "@/lib/site/results";
 
@@ -21,6 +22,7 @@ export async function GET(req: Request) {
     const db = getDb();
     removeConnection(db, "google");
     saveConnection(db, "google", { refreshToken }, ["refreshToken"]);
+    logEvent(db, { actor: actorEmail(), track: "account", action: "connected search console" });
     void syncSearchConsole(db);
   } catch (err) {
     return back(err instanceof Error ? err.message : "Google sign-in failed.");

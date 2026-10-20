@@ -7,7 +7,8 @@ import { githubAppConfig, installationToken, listInstallationRepos } from "@/lib
 import { getConnection, removeConnection, updateConnection } from "@/lib/integrations/store";
 import { isLlmConfigured, openRouterLlm } from "@/lib/llm";
 import { charge } from "@/lib/quota";
-import { getDb } from "@/lib/request-db";
+import { logEvent } from "@/lib/audit";
+import { actorEmail, getDb } from "@/lib/request-db";
 import { startAudit } from "@/lib/seo/audit";
 import { createFixPr, githubRepoAccess, writeSteps, type GithubConnection } from "@/lib/site/fixes";
 import { getIssue, setIssueStatus } from "@/lib/site/issues";
@@ -43,6 +44,7 @@ export async function openFixPr(formData: FormData) {
     const repo = await githubRepoAccess(db);
     consume(db, "ai");
     charge(db, "ai");
+    logEvent(db, { actor: actorEmail(), track: "site", action: "asked for a fix PR", target: `${ids.length} issue${ids.length === 1 ? "" : "s"}` });
     ({ prId, skipped } = await createFixPr(db, openRouterLlm, repo, ids));
   } catch (err) {
     fail("/site", err, "Couldn't open the pull request.");
@@ -96,5 +98,6 @@ export async function chooseRepo(formData: FormData) {
 export async function disconnect(formData: FormData) {
   const provider = z.enum(["github", "google"]).parse(formData.get("provider"));
   removeConnection(getDb(), provider);
+  logEvent(getDb(), { actor: actorEmail(), track: "account", action: `disconnected ${provider}` });
   redirect("/site/settings");
 }
