@@ -20,6 +20,7 @@ import { draftMessage } from "@/lib/draft";
 import { researchLead } from "@/lib/research";
 import { readUploads, countWords, MAX_DESCRIPTION_WORDS } from "@/lib/documents";
 import { isAdminEmail } from "@/lib/admin";
+import { runBackupNow } from "@/lib/backup";
 import { getAccount, getAccountsDb, listWorkspaceIds } from "@/lib/accounts";
 import { getWorkspaceDb } from "@/lib/db";
 import { isPlanId } from "@/lib/pricing";
@@ -257,6 +258,15 @@ export async function saveContact(formData: FormData) {
 }
 
 /** Crawl the site, run the checks and write a fix plan, in the background. */
+/** Admin only: take a backup snapshot now. */
+export async function backupNow() {
+  const user = currentUser();
+  const email = user ? getAccount(getAccountsDb(), user.userId)?.email : undefined;
+  if (!isAdminEmail(email)) throw new Error("Not allowed");
+  await runBackupNow();
+  revalidatePath("/admin");
+}
+
 /** Admin only: move a workspace to a plan. */
 export async function setWorkspacePlan(formData: FormData) {
   const input = z.object({ workspaceId: id, plan: z.string() }).parse(Object.fromEntries(formData));
