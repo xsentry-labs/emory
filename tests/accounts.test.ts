@@ -39,12 +39,15 @@ afterEach(() => {
 
 describe("session tokens", () => {
   it("round-trips, and rejects tampering, wrong secrets and expiry", async () => {
-    const token = await signSession("s3cret", 7, 3, 1_000);
-    expect(await verifySession("s3cret", token, 2_000)).toEqual({ userId: 7, workspaceId: 3 });
+    const token = await signSession("s3cret", 7, 3, 1_000, 2);
+    expect(await verifySession("s3cret", token, 2_000)).toEqual({ userId: 7, workspaceId: 3, version: 2 });
     expect(await verifySession("other", token, 2_000)).toBeNull();
-    const [u, , exp, sig] = token.split(".");
-    expect(await verifySession("s3cret", `${u}.99.${exp}.${sig}`, 2_000)).toBeNull(); // swapped workspace
-    expect(await verifySession("s3cret", `${u}.3.${exp}.${sig}x`, 2_000)).toBeNull();
+    // A token from before versions existed (4 parts) no longer verifies.
+    expect(await verifySession("s3cret", token.split(".").filter((_, i) => i !== 2).join("."), 2_000)).toBeNull();
+    const [u, , v, exp, sig] = token.split(".");
+    expect(await verifySession("s3cret", `${u}.99.${v}.${exp}.${sig}`, 2_000)).toBeNull(); // swapped workspace
+    expect(await verifySession("s3cret", `${u}.3.9.${exp}.${sig}`, 2_000)).toBeNull(); // swapped version
+    expect(await verifySession("s3cret", `${u}.3.${v}.${exp}.${sig}x`, 2_000)).toBeNull();
     expect(await verifySession("s3cret", token, 1_000 + SESSION_TTL_MS + 1)).toBeNull();
     expect(await verifySession("s3cret", "garbage", 2_000)).toBeNull();
     expect(await verifySession("s3cret", undefined, 2_000)).toBeNull();

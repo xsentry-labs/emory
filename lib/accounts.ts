@@ -39,6 +39,35 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX reports_created ON reports(created_at);
   `,
+  `
+  ALTER TABLE users ADD COLUMN email_verified_at INTEGER;
+  -- Bumped to sign out every session (password change, removal from a team).
+  ALTER TABLE users ADD COLUMN session_version INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner','member'));
+  UPDATE users SET role = 'owner' WHERE id IN (SELECT owner_user_id FROM workspaces);
+
+  -- One-time links: password reset and email verification. Only a hash of the token is stored.
+  CREATE TABLE auth_tokens (
+    id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL CHECK (purpose IN ('reset','verify')),
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    used_at INTEGER
+  );
+  CREATE TABLE invites (
+    id INTEGER PRIMARY KEY,
+    workspace_id INTEGER NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    invited_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    accepted_at INTEGER
+  );
+  CREATE INDEX invites_workspace ON invites(workspace_id);
+  `,
 ];
 
 export function openAccountsDb(file: string): DB {
@@ -124,10 +153,15 @@ export interface Account {
 const EMAIL_RE = /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/;
 export const normalizeEmail = (e: string) => e.trim().toLowerCase();
 
+export const validPassword = (p: string) => {
+  if (p.length < 8) throw new Error("Use a password of at least 8 characters.");
+  if (p.length > 200) throw new Error("That password is too long.");
+};
+
 export function createAccount(db: DB, input: { email: string; password: string; workspaceName?: string }): Account {
   const email = normalizeEmail(input.email);
   if (!EMAIL_RE.test(email)) throw new Error("Enter a valid email address.");
-  if (input.password.length < 8) throw new Error("Use a password of at least 8 characters.");
+  validPassword(input.password);
   if (db.prepare(`SELECT 1 FROM users WHERE email = ?`).get(email)) {
     throw new Error("An account with that email already exists. Log in instead.");
   }
@@ -145,7 +179,7 @@ export function createAccount(db: DB, input: { email: string; password: string; 
       );
     const userId = Number(
       db
-        .prepare(`INSERT INTO users (email, password_hash, workspace_id, created_at) VALUES (?, ?, ?, ?)`)
+        .prepare(`INSERT INTO users (email, password_hash, workspace_id, role, created_at) VALUES (?, ?, ?, 'owner', ?)`)
         .run(email, hashPassword(input.password), workspaceId, t).lastInsertRowid,
     );
     db.prepare(`UPDATE workspaces SET owner_user_id = ? WHERE id = ?`).run(userId, workspaceId);
