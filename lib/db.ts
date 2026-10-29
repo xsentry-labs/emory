@@ -201,3 +201,13 @@ export function getWorkspaceDb(workspaceId: number): DB {
   }
   return db;
 }
+
+/** Close and delete a workspace's database files (after the workspace itself is deleted). */
+export function dropWorkspaceDb(workspaceId: number): void {
+  if (!Number.isInteger(workspaceId) || workspaceId < 1) throw new Error("Invalid workspace");
+  const cache = g.__emoryWorkspaceDbs;
+  cache?.get(workspaceId)?.close();
+  cache?.delete(workspaceId);
+  const file = path.join(dataDir(), "workspaces", `${workspaceId}.db`);
+  for (const suffix of ["", "-wal", "-shm"]) fs.rmSync(file + suffix, { force: true });
+}

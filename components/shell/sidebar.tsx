@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logout } from "@/app/auth/actions";
@@ -127,9 +127,9 @@ export function Sidebar(props: SidebarProps) {
           <span aria-hidden className="flex size-8 shrink-0 items-center justify-center border border-line font-mono text-[13px] text-ink">
             {props.email.slice(0, 1) || "?"}
           </span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink" title={props.email}>
+          <Link href="/settings" className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink hover:underline" title={`${props.email} · settings`}>
             {props.email}
-          </span>
+          </Link>
           <ThemeToggle initial={props.theme} className="size-8" />
           <button type="submit" className="inline-flex size-8 items-center justify-center text-mute hover:text-ink" aria-label="Log out" title="Log out">
             <LogOut className="size-4" aria-hidden />
@@ -144,6 +144,9 @@ export function Sidebar(props: SidebarProps) {
             emory
           </Link>
           <div className="flex items-center gap-1">
+            <Link href="/settings" className="inline-flex size-9 items-center justify-center text-mute hover:text-ink" aria-label="Settings">
+              <Settings className="size-4" aria-hidden />
+            </Link>
             <ThemeToggle initial={props.theme} />
             <form action={logout}>
               <button type="submit" className="inline-flex size-9 items-center justify-center text-mute hover:text-ink" aria-label="Log out">

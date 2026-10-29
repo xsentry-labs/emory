@@ -5,12 +5,15 @@ import { SESSION_COOKIE, sessionSecret, verifySession } from "./lib/session-toke
 // always overwritten here, so a client can never supply its own.
 const WORKSPACE_HEADER = "x-emory-workspace";
 const USER_HEADER = "x-emory-user";
+const VERSION_HEADER = "x-emory-session";
 
 const PUBLIC_PAGES = new Set(["/login", "/signup"]);
+// One-time links work whether or not someone is signed in on this browser.
+const LINK_PAGES = new Set(["/forgot", "/reset", "/invite", "/verify"]);
 // The marketing site: anyone can view it; signed-in visitors get their identity attached.
 const MARKETING_PAGES = new Set(["/", "/pricing", "/start"]);
 // The public site report can be viewed (and saved) by anyone with its link.
-const isMarketing = (pathname: string) => MARKETING_PAGES.has(pathname) || pathname.startsWith("/report/");
+const isMarketing = (pathname: string) => MARKETING_PAGES.has(pathname) || pathname.startsWith("/report/") || LINK_PAGES.has(pathname);
 
 export async function middleware(req: NextRequest) {
   const secret = sessionSecret();
@@ -24,11 +27,13 @@ export async function middleware(req: NextRequest) {
   const headers = new Headers(req.headers);
   headers.delete(WORKSPACE_HEADER);
   headers.delete(USER_HEADER);
+  headers.delete(VERSION_HEADER);
 
   if (isMarketing(pathname)) {
     if (claims) {
       headers.set(WORKSPACE_HEADER, String(claims.workspaceId));
       headers.set(USER_HEADER, String(claims.userId));
+      headers.set(VERSION_HEADER, String(claims.version));
     }
     return NextResponse.next({ request: { headers } });
   }
@@ -46,6 +51,7 @@ export async function middleware(req: NextRequest) {
 
   headers.set(WORKSPACE_HEADER, String(claims.workspaceId));
   headers.set(USER_HEADER, String(claims.userId));
+  headers.set(VERSION_HEADER, String(claims.version));
   return NextResponse.next({ request: { headers } });
 }
 

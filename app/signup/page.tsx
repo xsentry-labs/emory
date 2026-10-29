@@ -16,10 +16,11 @@ export default function SignupPage({
 }) {
   const report = searchParams.report ? getReport(getAccountsDb(), searchParams.report) : null;
   const site = report?.site.replace(/^https?:\/\//, "");
+  const open = process.env.SIGNUPS_OPEN === "true";
   return (
     <AuthCard
       title="save your report"
-      subtitle={site ? `create an account to keep the report for ${site} and start on it. you'll need an invite code.` : "you'll need an invite code to join."}
+      subtitle={site ? `create an account to keep the report for ${site} and start on it. ${open ? "it's free to start." : "you'll need an invite code."}` : open ? "free to start. no card needed." : "you'll need an invite code to join."}
       error={searchParams.error}
       footer={
         <>
@@ -48,10 +49,12 @@ export default function SignupPage({
           <Input id="password" name="password" type="password" autoComplete="new-password" minLength={8} required />
           <p className="text-caption text-mute">At least 8 characters.</p>
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="invite">Invite code</Label>
-          <Input id="invite" name="invite" autoComplete="off" required />
-        </div>
+        {open ? null : (
+          <div className="space-y-1.5">
+            <Label htmlFor="invite">Invite code</Label>
+            <Input id="invite" name="invite" autoComplete="off" required />
+          </div>
+        )}
         <SubmitButton pendingLabel="Creating account...">Create account</SubmitButton>
       </form>
     </AuthCard>

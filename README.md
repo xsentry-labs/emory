@@ -60,6 +60,16 @@ Create one at GitHub → Settings → Developer settings → GitHub Apps → New
 
 In Google Cloud: enable the **Google Search Console API**, configure the OAuth consent screen with the scope `https://www.googleapis.com/auth/webmasters.readonly`, and create an **OAuth client ID** (web application) with the redirect URI `APP_URL/api/connect/google/callback`. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` and `APP_URL`. Optionally create an API key with the PageSpeed Insights API enabled and set `PAGESPEED_API_KEY`.
 
+## Accounts and teams
+
+- **Sessions** are signed cookies carrying the user's `session_version`. The middleware checks the signature; every server render and action also checks the version, workspace and user still match (`lib/request-db.ts`). Changing or resetting a password, or being removed from a team, bumps the version and signs out every other session. A revoked cookie is cleared at `/api/auth/expired`.
+- **Password reset** (`/forgot` → email → `/reset`): single-use link, valid for one hour; the reply is the same whether or not the account exists, and requests are rate limited. Only a SHA-256 of each link token is stored (`lib/account-admin.ts`).
+- **Email verification**: sent at sign-up, resendable from settings or the in-app banner, valid 7 days. Inviting teammates needs a verified email; a reset link or an accepted invite also counts as proof.
+- **Teams** (`/settings/team`): the owner invites by email (7-day link, up to 20 people). Invitees set a password and join as members; they don't need an invite code. Everyone in a workspace sees and approves the same work. An email that already has an account elsewhere can't be invited yet (one workspace per login).
+- **Deleting** (`/settings`): confirmed with your email and password. A member's deletion removes only their login; the owner's deletes the workspace, every member, every invite and the workspace's database file. Backups keep it for up to `BACKUP_KEEP_DAYS`.
+- **Account email** goes through `MAIL_URL`/`MAIL_FROM` (`lib/system-mail.ts`), separate from the outreach mailbox. Unset, links are printed to the log in development; in production sending fails with a clear error.
+- **Open sign-ups**: `SIGNUPS_OPEN=true` removes the invite code from sign-up. Add bot protection first.
+
 ## Limits
 
 - Lead sourcing quality depends on the model and its web search; always review new leads. Most sourced leads will have no public email, so add one before they can be emailed.
